@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 
 import nudenet
-from flask import current_app
 
 from config import Config
 
@@ -28,35 +27,19 @@ def _init_nude_model():
 
     classifier_cls = getattr(nudenet, "NudeClassifier", None)
     if classifier_cls:
-        try:
-            if model_path:
-                model_mode = "classifier"
-                return classifier_cls(model_path=model_path)
-            model_mode = "classifier"
-            return classifier_cls()
-        except Exception:
-            pass
+        model_mode = "classifier"
+        return classifier_cls(model_path=model_path) if model_path else classifier_cls()
 
     detector_cls = getattr(nudenet, "NudeDetector", None)
     if detector_cls:
-        try:
-            if model_path:
-                model_mode = "detector"
-                return detector_cls(model_path=model_path)
-            model_mode = "detector"
-            return detector_cls()
-        except Exception:
-            pass
+        model_mode = "detector"
+        return detector_cls(model_path=model_path) if model_path else detector_cls()
 
     model_mode = "none"
     return None
 
 
-try:
-    nude_model = _init_nude_model()
-except Exception:
-    nude_model = None
-    model_mode = "none"
+nude_model = _init_nude_model()
 
 
 def allowed_file(filename: str) -> bool:
@@ -65,51 +48,47 @@ def allowed_file(filename: str) -> bool:
 
 
 def get_video_duration(video_path: str) -> float | None:
-    try:
-        result = subprocess.run(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                video_path,
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            return None
-        return float(result.stdout.strip())
-    except Exception:
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            video_path,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
         return None
+
+    out = result.stdout.strip()
+    return float(out) if out else None
 
 
 def _extract_frame(video_path: str, frame_path: str, timestamp: float) -> bool:
-    try:
-        result = subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-ss",
-                f"{timestamp:.3f}",
-                "-i",
-                video_path,
-                "-vframes",
-                "1",
-                frame_path,
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-        return result.returncode == 0 and os.path.exists(frame_path)
-    except Exception:
-        return False
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            f"{timestamp:.3f}",
+            "-i",
+            video_path,
+            "-vframes",
+            "1",
+            frame_path,
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0 and os.path.exists(frame_path)
 
 
 def _classify_frame(frame_path: str) -> tuple[bool, float]:
@@ -136,19 +115,16 @@ def _classify_frame(frame_path: str) -> tuple[bool, float]:
 
 
 def generate_thumbnail(video_path: str, thumb_path: str) -> bool:
-    try:
-        duration = get_video_duration(video_path)
-        timestamp = str(max(min(duration / 2, duration - 0.5), 0.5)) if duration else "1.0"
+    duration = get_video_duration(video_path)
+    timestamp = str(max(min(duration / 2, duration - 0.5), 0.5)) if duration else "1.0"
 
-        result = subprocess.run(
-            ["ffmpeg", "-y", "-ss", timestamp, "-i", video_path, "-vframes", "1", thumb_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-        return result.returncode == 0 and os.path.exists(thumb_path)
-    except Exception:
-        return False
+    result = subprocess.run(
+        ["ffmpeg", "-y", "-ss", timestamp, "-i", video_path, "-vframes", "1", thumb_path],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0 and os.path.exists(thumb_path)
 
 
 def moderate_video_content_with_ai(
@@ -176,15 +152,7 @@ def moderate_video_content_with_ai(
                 continue
 
             checked_frames += 1
-            try:
-                allowed, unsafe_score = _classify_frame(frame_path)
-            except Exception:
-                try:
-                    current_app.logger.exception("Ошибка AI-модерации кадра")
-                except RuntimeError:
-                    pass
-                continue
-
+            allowed, unsafe_score = _classify_frame(frame_path)
             max_unsafe_score = max(max_unsafe_score, unsafe_score)
             if not allowed:
                 return False, "unsafe_video_segment", unsafe_score, checked_frames
@@ -199,17 +167,9 @@ def moderate_thumbnail_with_ai(thumb_path: str) -> tuple[bool, str | None, float
     if nude_model is None:
         return True, "skipped_no_local_model", 0.0
 
-    try:
-        allowed, unsafe_score = _classify_frame(thumb_path)
-        label = "safe" if allowed else "unsafe"
-        return allowed, label, unsafe_score
-    except Exception:
-        try:
-            current_app.logger.exception("Ошибка во время модерации превью")
-        except RuntimeError:
-            pass
-        return True, "moderation_error", 0.0
-
+    allowed, unsafe_score = _classify_frame(thumb_path)
+    label = "safe" if allowed else "unsafe"
+    return allowed, label, unsafe_score
 
 
 def allowed_image_file(filename: str) -> bool:

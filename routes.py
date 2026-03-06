@@ -77,10 +77,18 @@ def upload():
     moderation_label = None
     moderation_score = None
 
-    is_video_approved, video_moderation_label, video_moderation_score, checked_frames = moderate_video_content_with_ai(
-        save_path,
-        sample_count=5,
-    )
+    try:
+        is_video_approved, video_moderation_label, video_moderation_score, checked_frames = moderate_video_content_with_ai(
+            save_path,
+            sample_count=5,
+        )
+    except Exception as exc:
+        current_app.logger.exception("Ошибка AI-модерации видео: %s", exc)
+        for path in [save_path, thumb_path]:
+            if os.path.exists(path):
+                os.remove(path)
+        flash("Внутренняя ошибка модерации видео. Попробуйте позже.", "error")
+        return redirect(url_for("main.upload"))
 
     if not is_video_approved:
         for path in [save_path, thumb_path]:
@@ -96,7 +104,15 @@ def upload():
     moderation_score = video_moderation_score
 
     if thumbnail_ok:
-        is_approved, thumb_label, thumb_score = moderate_thumbnail_with_ai(thumb_path)
+        try:
+            is_approved, thumb_label, thumb_score = moderate_thumbnail_with_ai(thumb_path)
+        except Exception as exc:
+            current_app.logger.exception("Ошибка AI-модерации превью: %s", exc)
+            for path in [save_path, thumb_path]:
+                if os.path.exists(path):
+                    os.remove(path)
+            flash("Внутренняя ошибка модерации превью. Попробуйте позже.", "error")
+            return redirect(url_for("main.upload"))
         if not is_approved:
             for path in [save_path, thumb_path]:
                 if os.path.exists(path):
@@ -163,6 +179,39 @@ def video_comment(video_id: int):
         flash("Комментарий добавлен.", "success")
     return redirect(url_for("main.video_detail", video_id=video_id))
 
+
+
+
+@bp.route("/video/<int:video_id>/delete", methods=["POST"], endpoint="video_delete")
+@login_required
+def video_delete(video_id: int):
+    video = Video.query.get_or_404(video_id)
+
+    if video.user_id != current_user.id:
+        flash("Можно удалять только свои видео.", "error")
+        return redirect(url_for("main.video_detail", video_id=video.id))
+
+    # Удаляем реакции вручную, чтобы не упереться в FK-констрейнты
+    VideoReaction.query.filter_by(video_id=video.id).delete(synchronize_session=False)
+
+    file_paths = [
+        os.path.join(current_app.config["UPLOAD_FOLDER"], video.filename),
+    ]
+    if video.thumbnail_filename:
+        file_paths.append(os.path.join(current_app.config["UPLOAD_FOLDER"], video.thumbnail_filename))
+
+    db.session.delete(video)
+    db.session.commit()
+
+    for file_path in file_paths:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
+
+    flash("Видео удалено.", "success")
+    return redirect(url_for("main.index"))
 
 @bp.route("/uploads/<path:filename>", endpoint="uploaded_file")
 def uploaded_file(filename: str):

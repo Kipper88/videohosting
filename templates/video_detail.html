@@ -62,6 +62,13 @@
       <button class="react-btn {% if user_reaction == -1 %}active{% endif %}" data-action="dislike">Дизлайк <span class="dislikes-count">{{ video.dislikes }}</span></button>
     </div>
 
+
+    {% if current_user.is_authenticated and video.user_id == current_user.id %}
+    <form method="post" action="{{ url_for('main.video_delete', video_id=video.id) }}" onsubmit="return confirm('Удалить это видео?');" style="margin-bottom:10px;">
+      <button type="submit" class="danger-btn">Удалить видео</button>
+    </form>
+    {% endif %}
+
     {% if video.description %}
       <p class="description">{{ video.description }}</p>
     {% endif %}

@@ -82,6 +82,8 @@ button:hover { background: #2a2a2a; }
 .watch-meta { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .actions { display: flex; gap: 8px; margin-bottom: 10px; }
 .react-btn.active { border-color: #4c8bf5; color: #4c8bf5; }
+.danger-btn { background: #4a1f1f; border-color: #7f1d1d; color: #fecaca; }
+.danger-btn:hover { background: #5b1f1f; }
 .description { background: var(--surface); border-radius: 12px; padding: 12px; }
 
 .comments textarea, input[type="text"], input[type="password"], input[type="email"], input[type="file"], textarea { width: 100%; background: #121212; border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 10px; }
