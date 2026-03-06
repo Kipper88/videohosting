@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from flask import (
     Blueprint,
@@ -12,51 +13,58 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from werkzeug.utils import secure_filename
 
-from models import db, User, Video, VideoReaction, Subscription
+from models import Subscription, User, Video, VideoComment, VideoReaction, db
 from services import allowed_file, generate_thumbnail, moderate_thumbnail_with_ai
-
+from video_logic import add_comment, get_home_feed, get_related_videos, toggle_reaction
 
 bp = Blueprint("main", __name__)
 
 
 @bp.route("/", endpoint="index")
 def index():
-    videos = Video.query.order_by(Video.created_at.desc()).all()
-    return render_template("index.html", videos=videos)
+    query = request.args.get("q", "").strip()
+    tab = request.args.get("tab", "home")
+    only_subscriptions = tab == "subscriptions" and current_user.is_authenticated
+
+    videos = get_home_feed(
+        search=query,
+        only_subscriptions=only_subscriptions,
+        viewer_id=current_user.id if current_user.is_authenticated else None,
+    )
+
+    return render_template("index.html", videos=videos, query=query, tab=tab)
 
 
 @bp.route("/upload", methods=["GET", "POST"], endpoint="upload")
+@login_required
 def upload():
     if request.method == "GET":
         return render_template("upload.html")
 
     title = request.form.get("title", "").strip()
+    description = request.form.get("description", "").strip()
     file = request.files.get("file")
 
     if not title:
-        flash("Введите название видео.")
+        flash("Введите название видео.", "error")
         return redirect(url_for("main.upload"))
 
     if not file or file.filename == "":
-        flash("Выберите видеофайл.")
+        flash("Выберите видеофайл.", "error")
         return redirect(url_for("main.upload"))
 
     if not allowed_file(file.filename):
-        flash("Недопустимый формат файла. Разрешены: mp4, webm, ogg, mov.")
+        flash("Недопустимый формат файла. Разрешены: mp4, webm, ogg, mov.", "error")
         return redirect(url_for("main.upload"))
 
-    filename = f"{int(current_app.logger.handlers and 0 or 0)}_{file.filename}"
-    # Используем время для уникальности имени (как было раньше)
-    from datetime import datetime
-
-    filename = f"{int(datetime.utcnow().timestamp())}_{file.filename}"
+    filename = f"{int(datetime.utcnow().timestamp())}_{secure_filename(file.filename)}"
     save_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
     file.save(save_path)
 
     thumb_filename = f"{filename}.jpg"
     thumb_path = os.path.join(current_app.config["UPLOAD_FOLDER"], thumb_filename)
-
     thumbnail_ok = generate_thumbnail(save_path, thumb_path)
 
     is_approved = True
@@ -64,25 +72,19 @@ def upload():
     moderation_score = None
 
     if thumbnail_ok:
-        is_approved, moderation_label, moderation_score = moderate_thumbnail_with_ai(
-            thumb_path
-        )
+        is_approved, moderation_label, moderation_score = moderate_thumbnail_with_ai(thumb_path)
 
     if not is_approved:
-        # Удаляем загруженное видео и превью, если модерация не прошла
-        try:
-            if os.path.exists(save_path):
-                os.remove(save_path)
-            if os.path.exists(thumb_path):
-                os.remove(thumb_path)
-        except OSError:
-            pass
-
+        for path in [save_path, thumb_path]:
+            if os.path.exists(path):
+                os.remove(path)
         flash("Видео отклонено модерацией ИИ.", "error")
         return redirect(url_for("main.upload"))
 
     video = Video(
+        user_id=current_user.id,
         title=title,
+        description=description,
         filename=filename,
         thumbnail_filename=thumb_filename if thumbnail_ok else None,
         is_approved=is_approved,
@@ -92,34 +94,47 @@ def upload():
     db.session.add(video)
     db.session.commit()
 
-    if not thumbnail_ok:
-        flash(
-            "Видео загружено, но не удалось создать превью (проверьте, что установлен ffmpeg).",
-            "error",
-        )
-    else:
-        flash("Видео успешно загружено и прошло модерацию ИИ.")
-    return redirect(url_for("main.index"))
+    flash("Видео опубликовано.", "success")
+    return redirect(url_for("main.video_detail", video_id=video.id))
 
 
 @bp.route("/video/<int:video_id>", endpoint="video_detail")
 def video_detail(video_id: int):
     video = Video.query.get_or_404(video_id)
-    user_reaction = None
+    video.views += 1
+    db.session.commit()
+
+    user_reaction = 0
     if current_user.is_authenticated:
-        user_reaction = VideoReaction.query.filter_by(
-            user_id=current_user.id, video_id=video.id
-        ).first()
-    return render_template("video_detail.html", video=video, user_reaction=user_reaction)
+        reaction = VideoReaction.query.filter_by(user_id=current_user.id, video_id=video.id).first()
+        user_reaction = reaction.value if reaction else 0
+
+    comments = (
+        VideoComment.query.filter_by(video_id=video.id)
+        .order_by(VideoComment.created_at.desc())
+        .all()
+    )
+
+    related_videos = get_related_videos(video.id)
+
+    return render_template(
+        "video_detail.html",
+        video=video,
+        comments=comments,
+        related_videos=related_videos,
+        user_reaction=user_reaction,
+    )
 
 
-@bp.route("/like/<int:video_id>", methods=["POST"], endpoint="like_video")
+@bp.route("/video/<int:video_id>/comments", methods=["POST"], endpoint="video_comment")
 @login_required
-def like_video(video_id: int):
-    """
-    Старый эндпоинт лайков оставлен для совместимости, но теперь
-    основная логика в API /api/videos/<id>/react. Здесь просто редирект.
-    """
+def video_comment(video_id: int):
+    Video.query.get_or_404(video_id)
+    text = request.form.get("text", "")
+    if not add_comment(video_id=video_id, user_id=current_user.id, text=text):
+        flash("Комментарий не может быть пустым.", "error")
+    else:
+        flash("Комментарий добавлен.", "success")
     return redirect(url_for("main.video_detail", video_id=video_id))
 
 
@@ -131,48 +146,22 @@ def uploaded_file(filename: str):
 @bp.route("/api/videos/<int:video_id>/react", methods=["POST"], endpoint="video_react")
 @login_required
 def video_react(video_id: int):
-    """
-    AJAX-лайки/дизлайки.
-    body: {"action": "like"|"dislike"}.
-    """
     video = Video.query.get_or_404(video_id)
-    data = request.get_json(silent=True) or {}
-    action = data.get("action")
+    action = (request.get_json(silent=True) or {}).get("action")
     if action not in {"like", "dislike"}:
         return jsonify({"error": "invalid_action"}), 400
 
-    value = 1 if action == "like" else -1
-
-    reaction = VideoReaction.query.filter_by(
-        user_id=current_user.id, video_id=video.id
-    ).first()
-
-    if reaction and reaction.value == value:
-        # Тот же самый клик — снимаем реакцию
-        db.session.delete(reaction)
-    else:
-        if reaction:
-            reaction.value = value
-        else:
-            reaction = VideoReaction(
-                user_id=current_user.id, video_id=video.id, value=value
-            )
-            db.session.add(reaction)
-
-    db.session.commit()
-
-    # Пересчитываем агрегаты
-    likes_count = VideoReaction.query.filter_by(video_id=video.id, value=1).count()
-    dislikes_count = VideoReaction.query.filter_by(video_id=video.id, value=-1).count()
-    video.likes = likes_count
-    video.dislikes = dislikes_count
-    db.session.commit()
+    likes_count, dislikes_count, user_reaction = toggle_reaction(
+        video=video,
+        user_id=current_user.id,
+        action=action,
+    )
 
     return jsonify(
         {
             "likes": likes_count,
             "dislikes": dislikes_count,
-            "user_reaction": value if reaction and reaction.value == value else 0,
+            "user_reaction": user_reaction,
         }
     )
 
@@ -180,17 +169,12 @@ def video_react(video_id: int):
 @bp.route("/u/<string:username>", endpoint="profile")
 def profile(username: str):
     user = User.query.filter_by(username=username).first_or_404()
-    videos = (
-        Video.query.filter_by(user_id=user.id)
-        .order_by(Video.created_at.desc())
-        .all()
-    )
+    videos = Video.query.filter_by(user_id=user.id).order_by(Video.created_at.desc()).all()
+
     is_subscribed = False
     if current_user.is_authenticated and current_user.id != user.id:
         is_subscribed = (
-            Subscription.query.filter_by(
-                follower_id=current_user.id, followed_id=user.id
-            ).first()
+            Subscription.query.filter_by(follower_id=current_user.id, followed_id=user.id).first()
             is not None
         )
 
@@ -215,19 +199,14 @@ def toggle_subscribe(username: str):
         flash("Нельзя подписаться на себя.", "error")
         return redirect(url_for("main.profile", username=username))
 
-    existing = Subscription.query.filter_by(
-        follower_id=current_user.id, followed_id=user.id
-    ).first()
+    existing = Subscription.query.filter_by(follower_id=current_user.id, followed_id=user.id).first()
 
     if existing:
         db.session.delete(existing)
         flash("Подписка отменена.", "success")
     else:
-        sub = Subscription(follower_id=current_user.id, followed_id=user.id)
-        db.session.add(sub)
+        db.session.add(Subscription(follower_id=current_user.id, followed_id=user.id))
         flash("Вы подписались на автора.", "success")
 
     db.session.commit()
     return redirect(url_for("main.profile", username=username))
-
-
