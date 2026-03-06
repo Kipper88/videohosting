@@ -19,6 +19,7 @@
 
       <div class="player-controls" data-controls>
         <button type="button" class="control-btn" data-play-toggle>▶</button>
+        <input type="range" min="0" max="100" value="70" step="1" class="volume-input" data-volume />
         <div class="progress-wrap" data-progress-wrap>
           <div class="timeline-preview-popover" data-preview-popover>
             <canvas width="240" height="135" data-preview-canvas></canvas>
@@ -27,6 +28,7 @@
           <input type="range" min="0" max="1000" value="0" step="1" class="progress-input" data-progress />
         </div>
         <span class="time-label" data-time-label>0:00 / 0:00</span>
+        <button type="button" class="control-btn" data-fullscreen>⛶</button>
       </div>
     </div>
 

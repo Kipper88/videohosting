@@ -6,13 +6,57 @@ from pathlib import Path
 import nudenet
 from flask import current_app
 
+from config import Config
 
-NUDE_CLASSIFIER_CLS = getattr(nudenet, "NudeClassifier", None)
+
+nude_model = None
+model_mode = "none"
+
+
+def _resolve_model_path() -> str | None:
+    candidates = [Config.AI_MODEL_PATH, Config.AI_MODEL_PATH_FALLBACK]
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def _init_nude_model():
+    global model_mode
+
+    model_path = _resolve_model_path()
+
+    classifier_cls = getattr(nudenet, "NudeClassifier", None)
+    if classifier_cls:
+        try:
+            if model_path:
+                model_mode = "classifier"
+                return classifier_cls(model_path=model_path)
+            model_mode = "classifier"
+            return classifier_cls()
+        except Exception:
+            pass
+
+    detector_cls = getattr(nudenet, "NudeDetector", None)
+    if detector_cls:
+        try:
+            if model_path:
+                model_mode = "detector"
+                return detector_cls(model_path=model_path)
+            model_mode = "detector"
+            return detector_cls()
+        except Exception:
+            pass
+
+    model_mode = "none"
+    return None
+
 
 try:
-    nude_classifier = NUDE_CLASSIFIER_CLS() if NUDE_CLASSIFIER_CLS else None
+    nude_model = _init_nude_model()
 except Exception:
-    nude_classifier = None
+    nude_model = None
+    model_mode = "none"
 
 
 def allowed_file(filename: str) -> bool:
@@ -69,13 +113,26 @@ def _extract_frame(video_path: str, frame_path: str, timestamp: float) -> bool:
 
 
 def _classify_frame(frame_path: str) -> tuple[bool, float]:
-    if nude_classifier is None:
+    if nude_model is None:
         return True, 0.0
 
-    result = nude_classifier.classify(frame_path)
-    data = result.get(frame_path, {})
-    unsafe_score = float(data.get("unsafe", 0.0))
-    return unsafe_score < 0.5, unsafe_score
+    threshold = Config.AI_UNSAFE_THRESHOLD
+
+    if model_mode == "classifier":
+        result = nude_model.classify(frame_path)
+        data = result.get(frame_path, {})
+        unsafe_score = float(data.get("unsafe", 0.0))
+        return unsafe_score < threshold, unsafe_score
+
+    if model_mode == "detector":
+        detections = nude_model.detect(frame_path) or []
+        max_score = 0.0
+        for detection in detections:
+            score = float(detection.get("score", 0.0))
+            max_score = max(max_score, score)
+        return max_score < threshold, max_score
+
+    return True, 0.0
 
 
 def generate_thumbnail(video_path: str, thumb_path: str) -> bool:
@@ -98,11 +155,7 @@ def moderate_video_content_with_ai(
     video_path: str,
     sample_count: int = 5,
 ) -> tuple[bool, str | None, float | None, int]:
-    """
-    Модерация по нескольким участкам видео.
-    Возвращает: allowed, label, max_score, checked_frames.
-    """
-    if nude_classifier is None:
+    if nude_model is None:
         return True, "skipped_no_local_model", 0.0, 0
 
     duration = get_video_duration(video_path)
@@ -111,8 +164,6 @@ def moderate_video_content_with_ai(
 
     checked_frames = 0
     max_unsafe_score = 0.0
-
-    # Проверяем равномерно по ролику, избегая самых краёв.
     timestamps = []
     for i in range(sample_count):
         ratio = (i + 1) / (sample_count + 1)
@@ -145,7 +196,7 @@ def moderate_video_content_with_ai(
 
 
 def moderate_thumbnail_with_ai(thumb_path: str) -> tuple[bool, str | None, float | None]:
-    if nude_classifier is None:
+    if nude_model is None:
         return True, "skipped_no_local_model", 0.0
 
     try:

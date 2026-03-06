@@ -1,4 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const persistedVolume = Number(localStorage.getItem("yclone_volume") ?? "0.7");
+  const persistedMuted = (localStorage.getItem("yclone_muted") ?? "false") === "true";
+
   const actions = document.querySelector(".actions[data-video-id]");
   if (actions) {
     const videoId = actions.getAttribute("data-video-id");
@@ -12,7 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ action }),
         credentials: "same-origin",
       });
-
       if (!response.ok) return;
 
       const data = await response.json();
@@ -36,12 +38,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     uploadInput.addEventListener("change", () => {
       const file = uploadInput.files?.[0];
-
       if (currentObjectUrl) {
         URL.revokeObjectURL(currentObjectUrl);
         currentObjectUrl = null;
       }
-
       if (!file) {
         uploadPreview.removeAttribute("src");
         uploadPreview.load();
@@ -50,9 +50,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const objectUrl = URL.createObjectURL(file);
-      currentObjectUrl = objectUrl;
-      uploadPreview.src = objectUrl;
+      currentObjectUrl = URL.createObjectURL(file);
+      uploadPreview.src = currentObjectUrl;
       uploadPreviewWrap.classList.add("ready");
       uploadPreviewPlaceholder.textContent = "Предпросмотр выбранного видео";
       uploadPreview.onloadeddata = () => {
@@ -64,6 +63,26 @@ document.addEventListener("DOMContentLoaded", () => {
       if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
     });
   }
+
+  const drawContain = (ctx, video, cw, ch) => {
+    const vw = video.videoWidth || 16;
+    const vh = video.videoHeight || 9;
+    const vr = vw / vh;
+    const cr = cw / ch;
+    let dw = cw;
+    let dh = ch;
+    if (vr > cr) {
+      dh = cw / vr;
+    } else {
+      dw = ch * vr;
+    }
+    const dx = (cw - dw) / 2;
+    const dy = (ch - dh) / 2;
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.drawImage(video, dx, dy, dw, dh);
+  };
 
   const player = document.querySelector("[data-player]");
   if (player) {
@@ -77,13 +96,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const previewCanvas = player.querySelector("[data-preview-canvas]");
     const previewTime = player.querySelector("[data-preview-time]");
     const storyboardTrack = document.querySelector("[data-storyboard-track]");
+    const volumeSlider = player.querySelector("[data-volume]");
+    const fullscreenBtn = player.querySelector("[data-fullscreen]");
 
     const previewCtx = previewCanvas.getContext("2d");
+    mainVideo.volume = Number.isFinite(persistedVolume) ? Math.min(Math.max(persistedVolume, 0), 1) : 0.7;
+    mainVideo.muted = persistedMuted;
+    if (volumeSlider) volumeSlider.value = String(Math.round(mainVideo.volume * 100));
 
     const formatTime = (sec) => {
       if (!Number.isFinite(sec)) return "0:00";
-      const m = Math.floor(sec / 60);
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
       const s = Math.floor(sec % 60);
+      if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
       return `${m}:${String(s).padStart(2, "0")}`;
     };
 
@@ -91,20 +117,37 @@ document.addEventListener("DOMContentLoaded", () => {
       timeLabel.textContent = `${formatTime(mainVideo.currentTime)} / ${formatTime(mainVideo.duration)}`;
     };
 
-    playToggle.addEventListener("click", () => {
-      if (mainVideo.paused) {
-        mainVideo.play();
-      } else {
-        mainVideo.pause();
-      }
-    });
+    playToggle?.addEventListener("click", () => (mainVideo.paused ? mainVideo.play() : mainVideo.pause()));
 
     mainVideo.addEventListener("play", () => {
-      playToggle.textContent = "⏸";
+      if (playToggle) playToggle.textContent = "⏸";
+    });
+    mainVideo.addEventListener("pause", () => {
+      if (playToggle) playToggle.textContent = "▶";
     });
 
-    mainVideo.addEventListener("pause", () => {
-      playToggle.textContent = "▶";
+    mainVideo.addEventListener("dblclick", () => {
+      if (!document.fullscreenElement) player.requestFullscreen?.();
+      else document.exitFullscreen?.();
+    });
+
+    fullscreenBtn?.addEventListener("click", () => {
+      if (!document.fullscreenElement) player.requestFullscreen?.();
+      else document.exitFullscreen?.();
+    });
+
+    volumeSlider?.addEventListener("input", () => {
+      const vol = Number(volumeSlider.value) / 100;
+      mainVideo.volume = vol;
+      mainVideo.muted = vol === 0;
+      localStorage.setItem("yclone_volume", String(vol));
+      localStorage.setItem("yclone_muted", String(mainVideo.muted));
+    });
+
+    mainVideo.addEventListener("volumechange", () => {
+      localStorage.setItem("yclone_volume", String(mainVideo.volume));
+      localStorage.setItem("yclone_muted", String(mainVideo.muted));
+      if (volumeSlider) volumeSlider.value = String(Math.round(mainVideo.volume * 100));
     });
 
     mainVideo.addEventListener("timeupdate", () => {
@@ -116,7 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
     mainVideo.addEventListener("loadedmetadata", async () => {
       updateTimeLabel();
       if (!storyboardTrack || !mainVideo.duration) return;
-
+      storyboardTrack.innerHTML = "";
       const snapshots = 10;
       for (let i = 0; i < snapshots; i += 1) {
         const t = (mainVideo.duration * i) / (snapshots - 1 || 1);
@@ -129,7 +172,7 @@ document.addEventListener("DOMContentLoaded", () => {
             item.innerHTML = `<canvas width="160" height="90"></canvas><span>${formatTime(t)}</span>`;
             const canvas = item.querySelector("canvas");
             const ctx = canvas.getContext("2d");
-            ctx.drawImage(previewVideo, 0, 0, canvas.width, canvas.height);
+            drawContain(ctx, previewVideo, canvas.width, canvas.height);
             item.addEventListener("click", () => {
               mainVideo.currentTime = t;
               if (mainVideo.paused) mainVideo.play();
@@ -153,19 +196,64 @@ document.addEventListener("DOMContentLoaded", () => {
       const relative = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
       const ratio = rect.width ? relative / rect.width : 0;
       const target = ratio * mainVideo.duration;
-
       previewPopover.style.display = "flex";
       previewPopover.style.left = `${relative}px`;
       previewTime.textContent = formatTime(target);
-
       previewVideo.currentTime = target;
-      previewVideo.onseeked = () => {
-        previewCtx.drawImage(previewVideo, 0, 0, previewCanvas.width, previewCanvas.height);
-      };
+      previewVideo.onseeked = () => drawContain(previewCtx, previewVideo, previewCanvas.width, previewCanvas.height);
     });
 
     progressWrap.addEventListener("mouseleave", () => {
       previewPopover.style.display = "none";
     });
   }
+
+  document.querySelectorAll("[data-hover-preview]").forEach((card) => {
+    const image = card.querySelector("[data-hover-image]");
+    const video = card.querySelector("[data-hover-video]");
+    const controls = card.querySelector("[data-hover-controls]");
+    const range = card.querySelector("[data-hover-progress]");
+    const muteBtn = card.querySelector("[data-hover-mute]");
+    if (!image || !video || !controls || !range || !muteBtn) return;
+
+    video.muted = true;
+    let over = false;
+
+    card.addEventListener("mouseenter", async () => {
+      over = true;
+      image.style.display = "none";
+      video.style.display = "block";
+      controls.style.display = "flex";
+      try {
+        await video.play();
+      } catch (_) {}
+    });
+
+    card.addEventListener("mouseleave", () => {
+      over = false;
+      video.pause();
+      video.currentTime = 0;
+      range.value = "0";
+      image.style.display = "block";
+      video.style.display = "none";
+      controls.style.display = "none";
+    });
+
+    video.addEventListener("timeupdate", () => {
+      if (!video.duration || !over) return;
+      range.value = String(Math.floor((video.currentTime / video.duration) * 1000));
+    });
+
+    range.addEventListener("input", () => {
+      if (!video.duration) return;
+      video.currentTime = (Number(range.value) / 1000) * video.duration;
+    });
+
+    muteBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      video.muted = !video.muted;
+      muteBtn.textContent = video.muted ? "🔇" : "🔊";
+    });
+  });
 });

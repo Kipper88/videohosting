@@ -8,9 +8,16 @@
 
 <section class="video-grid">
   {% for video in videos %}
-    <article class="video-card">
-      <a href="{{ url_for('main.video_detail', video_id=video.id) }}">
-        <img class="thumb" src="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% else %}{{ url_for('main.uploaded_file', filename=video.filename) }}{% endif %}" alt="{{ video.title }}" />
+    <article class="video-card" data-hover-preview>
+      <a href="{{ url_for('main.video_detail', video_id=video.id) }}" class="thumb-link">
+        <img class="thumb" src="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% else %}{{ url_for('main.uploaded_file', filename=video.filename) }}{% endif %}" alt="{{ video.title }}" data-hover-image />
+        <video class="thumb-preview-video" muted preload="metadata" data-hover-video>
+          <source src="{{ url_for('main.uploaded_file', filename=video.filename) }}" type="video/mp4" />
+        </video>
+        <div class="thumb-preview-controls" data-hover-controls>
+          <input type="range" min="0" max="1000" value="0" step="1" data-hover-progress />
+          <button type="button" class="mini-mute-btn" data-hover-mute>🔇</button>
+        </div>
       </a>
       <div class="video-info">
         <a class="title" href="{{ url_for('main.video_detail', video_id=video.id) }}">{{ video.title }}</a>
