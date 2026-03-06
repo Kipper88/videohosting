@@ -1,9 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{{ profile_user.username }} · Профиль{% endblock %}
 {% block content %}
-<section class="feed-header">
-  <h1>@{{ profile_user.username }}</h1>
-  <span>{{ subscribers_count }} подписчиков · {{ subscriptions_count }} подписок</span>
+<section class="feed-header profile-header">
+  <div class="channel-head">
+    <img class="avatar-lg" src="{% if profile_user.avatar_url %}{{ url_for('main.uploaded_file', filename=profile_user.avatar_url) }}{% else %}{{ url_for('static', filename='img/default-avatar.svg') }}{% endif %}" alt="avatar" />
+    <div>
+      <h1>@{{ profile_user.username }}</h1>
+      <span>{{ subscribers_count }} подписчиков · {{ subscriptions_count }} подписок</span>
+      {% if profile_user.bio %}<p class="muted">{{ profile_user.bio }}</p>{% endif %}
+    </div>
+  </div>
 </section>
 
 {% if current_user.is_authenticated and current_user.id != profile_user.id %}

@@ -4,12 +4,7 @@
 <div class="watch-layout">
   <section>
     <div class="player-frame custom-player" data-player>
-      <video
-        class="player"
-        preload="metadata"
-        poster="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% endif %}"
-        data-main-video
-      >
+      <video class="player" preload="metadata" poster="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% endif %}" data-main-video>
         <source src="{{ url_for('main.uploaded_file', filename=video.filename) }}" type="video/mp4" />
       </video>
 
@@ -18,7 +13,15 @@
       </video>
 
       <div class="player-controls" data-controls>
-        <button type="button" class="control-btn" data-play-toggle>▶</button>
+        <button type="button" class="control-btn" data-play-toggle aria-label="Play">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7-11-7Z"/></svg>
+        </button>
+        <button type="button" class="control-btn" data-backward aria-label="Назад 10">
+          <svg viewBox="0 0 24 24"><path d="M12 5V2L7 7l5 5V9c3.3 0 6 2.7 6 6a6 6 0 0 1-6 6 5.9 5.9 0 0 1-4.7-2.3l-1.6 1.2A8 8 0 0 0 12 23a8 8 0 0 0 0-16Z"/></svg>
+        </button>
+        <button type="button" class="control-btn" data-forward aria-label="Вперёд 10">
+          <svg viewBox="0 0 24 24"><path d="M12 5V2l5 5-5 5V9a6 6 0 1 0 4.7 9.7l1.6 1.2A8 8 0 1 1 12 5Z"/></svg>
+        </button>
         <input type="range" min="0" max="100" value="70" step="1" class="volume-input" data-volume />
         <div class="progress-wrap" data-progress-wrap>
           <div class="timeline-preview-popover" data-preview-popover>
@@ -27,8 +30,17 @@
           </div>
           <input type="range" min="0" max="1000" value="0" step="1" class="progress-input" data-progress />
         </div>
+        <select class="speed-select" data-speed>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+        </select>
         <span class="time-label" data-time-label>0:00 / 0:00</span>
-        <button type="button" class="control-btn" data-fullscreen>⛶</button>
+        <button type="button" class="control-btn" data-fullscreen aria-label="Fullscreen">
+          <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3Zm0-4h2V7h3V5H5v5h2Zm10 7h-3v2h5v-5h-2v3Zm0-12h-5v2h3v3h2V5Z"/></svg>
+        </button>
       </div>
     </div>
 
@@ -38,15 +50,16 @@
     </div>
 
     <h1 class="watch-title">{{ video.title }}</h1>
-    <div class="watch-meta">
+    <div class="watch-meta channel-under-video">
+      <img class="avatar-sm" src="{% if video.author and video.author.avatar_url %}{{ url_for('main.uploaded_file', filename=video.author.avatar_url) }}{% else %}{{ url_for('static', filename='img/default-avatar.svg') }}{% endif %}" alt="avatar" />
       <a href="{{ url_for('main.profile', username=video.author.username) if video.author else '#' }}">{{ video.author.username if video.author else 'Анонимный автор' }}</a>
       <span>{{ video.views }} просмотров</span>
       <span>{{ video.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
     </div>
 
     <div class="actions" data-video-id="{{ video.id }}">
-      <button class="react-btn {% if user_reaction == 1 %}active{% endif %}" data-action="like">👍 <span class="likes-count">{{ video.likes }}</span></button>
-      <button class="react-btn {% if user_reaction == -1 %}active{% endif %}" data-action="dislike">👎 <span class="dislikes-count">{{ video.dislikes }}</span></button>
+      <button class="react-btn {% if user_reaction == 1 %}active{% endif %}" data-action="like">Лайк <span class="likes-count">{{ video.likes }}</span></button>
+      <button class="react-btn {% if user_reaction == -1 %}active{% endif %}" data-action="dislike">Дизлайк <span class="dislikes-count">{{ video.dislikes }}</span></button>
     </div>
 
     {% if video.description %}

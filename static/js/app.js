@@ -1,4 +1,13 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const layout = document.getElementById("app-layout");
+  const sidebarToggle = document.getElementById("sidebar-toggle");
+  const sidebarCollapsed = localStorage.getItem("yclone_sidebar_collapsed") === "true";
+  if (layout && sidebarCollapsed) layout.classList.add("sidebar-collapsed");
+  sidebarToggle?.addEventListener("click", () => {
+    layout?.classList.toggle("sidebar-collapsed");
+    localStorage.setItem("yclone_sidebar_collapsed", String(layout?.classList.contains("sidebar-collapsed")));
+  });
+
   const persistedVolume = Number(localStorage.getItem("yclone_volume") ?? "0.7");
   const persistedMuted = (localStorage.getItem("yclone_muted") ?? "false") === "true";
 
@@ -16,7 +25,6 @@ document.addEventListener("DOMContentLoaded", () => {
         credentials: "same-origin",
       });
       if (!response.ok) return;
-
       const data = await response.json();
       likeBtn.querySelector(".likes-count").textContent = data.likes;
       dislikeBtn.querySelector(".dislikes-count").textContent = data.dislikes;
@@ -28,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
     dislikeBtn?.addEventListener("click", () => sendReaction("dislike"));
   }
 
+
   const uploadInput = document.querySelector('input[type="file"][name="file"]');
   const uploadPreviewWrap = document.querySelector(".upload-preview-wrap");
   const uploadPreview = document.querySelector("#upload-preview-video");
@@ -35,7 +44,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (uploadInput && uploadPreviewWrap && uploadPreview && uploadPreviewPlaceholder) {
     let currentObjectUrl = null;
-
     uploadInput.addEventListener("change", () => {
       const file = uploadInput.files?.[0];
       if (currentObjectUrl) {
@@ -49,16 +57,12 @@ document.addEventListener("DOMContentLoaded", () => {
         uploadPreviewPlaceholder.textContent = "Выберите файл, чтобы увидеть предпросмотр";
         return;
       }
-
       currentObjectUrl = URL.createObjectURL(file);
       uploadPreview.src = currentObjectUrl;
       uploadPreviewWrap.classList.add("ready");
       uploadPreviewPlaceholder.textContent = "Предпросмотр выбранного видео";
-      uploadPreview.onloadeddata = () => {
-        uploadPreview.currentTime = 0;
-      };
+      uploadPreview.onloadeddata = () => { uploadPreview.currentTime = 0; };
     });
-
     window.addEventListener("beforeunload", () => {
       if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
     });
@@ -71,11 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const cr = cw / ch;
     let dw = cw;
     let dh = ch;
-    if (vr > cr) {
-      dh = cw / vr;
-    } else {
-      dw = ch * vr;
-    }
+    if (vr > cr) dh = cw / vr; else dw = ch * vr;
     const dx = (cw - dw) / 2;
     const dy = (ch - dh) / 2;
     ctx.clearRect(0, 0, cw, ch);
@@ -89,6 +89,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const mainVideo = player.querySelector("[data-main-video]");
     const previewVideo = player.querySelector("[data-preview-video]");
     const playToggle = player.querySelector("[data-play-toggle]");
+    const backwardBtn = player.querySelector("[data-backward]");
+    const forwardBtn = player.querySelector("[data-forward]");
     const progress = player.querySelector("[data-progress]");
     const progressWrap = player.querySelector("[data-progress-wrap]");
     const timeLabel = player.querySelector("[data-time-label]");
@@ -98,6 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const storyboardTrack = document.querySelector("[data-storyboard-track]");
     const volumeSlider = player.querySelector("[data-volume]");
     const fullscreenBtn = player.querySelector("[data-fullscreen]");
+    const speedSelect = player.querySelector("[data-speed]");
 
     const previewCtx = previewCanvas.getContext("2d");
     mainVideo.volume = Number.isFinite(persistedVolume) ? Math.min(Math.max(persistedVolume, 0), 1) : 0.7;
@@ -117,14 +120,15 @@ document.addEventListener("DOMContentLoaded", () => {
       timeLabel.textContent = `${formatTime(mainVideo.currentTime)} / ${formatTime(mainVideo.duration)}`;
     };
 
-    playToggle?.addEventListener("click", () => (mainVideo.paused ? mainVideo.play() : mainVideo.pause()));
+    const togglePlay = () => (mainVideo.paused ? mainVideo.play() : mainVideo.pause());
+    playToggle?.addEventListener("click", togglePlay);
+    mainVideo.addEventListener("click", togglePlay);
 
-    mainVideo.addEventListener("play", () => {
-      if (playToggle) playToggle.textContent = "⏸";
-    });
-    mainVideo.addEventListener("pause", () => {
-      if (playToggle) playToggle.textContent = "▶";
-    });
+    backwardBtn?.addEventListener("click", () => { mainVideo.currentTime = Math.max(mainVideo.currentTime - 10, 0); });
+    forwardBtn?.addEventListener("click", () => { mainVideo.currentTime = Math.min(mainVideo.currentTime + 10, mainVideo.duration || mainVideo.currentTime + 10); });
+
+    mainVideo.addEventListener("play", () => { playToggle.classList.add("is-playing"); });
+    mainVideo.addEventListener("pause", () => { playToggle.classList.remove("is-playing"); });
 
     mainVideo.addEventListener("dblclick", () => {
       if (!document.fullscreenElement) player.requestFullscreen?.();
@@ -135,6 +139,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!document.fullscreenElement) player.requestFullscreen?.();
       else document.exitFullscreen?.();
     });
+
+    speedSelect?.addEventListener("change", () => { mainVideo.playbackRate = Number(speedSelect.value) || 1; });
 
     volumeSlider?.addEventListener("input", () => {
       const vol = Number(volumeSlider.value) / 100;
@@ -203,9 +209,7 @@ document.addEventListener("DOMContentLoaded", () => {
       previewVideo.onseeked = () => drawContain(previewCtx, previewVideo, previewCanvas.width, previewCanvas.height);
     });
 
-    progressWrap.addEventListener("mouseleave", () => {
-      previewPopover.style.display = "none";
-    });
+    progressWrap.addEventListener("mouseleave", () => { previewPopover.style.display = "none"; });
   }
 
   document.querySelectorAll("[data-hover-preview]").forEach((card) => {
@@ -224,9 +228,7 @@ document.addEventListener("DOMContentLoaded", () => {
       image.style.display = "none";
       video.style.display = "block";
       controls.style.display = "flex";
-      try {
-        await video.play();
-      } catch (_) {}
+      try { await video.play(); } catch (_) {}
     });
 
     card.addEventListener("mouseleave", () => {
@@ -237,6 +239,7 @@ document.addEventListener("DOMContentLoaded", () => {
       image.style.display = "block";
       video.style.display = "none";
       controls.style.display = "none";
+      video.muted = true;
     });
 
     video.addEventListener("timeupdate", () => {
@@ -253,7 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       e.stopPropagation();
       video.muted = !video.muted;
-      muteBtn.textContent = video.muted ? "🔇" : "🔊";
+      muteBtn.classList.toggle("is-unmuted", !video.muted);
     });
   });
 });

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Настройки канала{% endblock %}
+{% block content %}
+<div class="form-card">
+  <h1>Настройки канала</h1>
+  <form method="post" enctype="multipart/form-data" class="stack">
+    <label>Аватар
+      <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp" />
+    </label>
+    <label>Описание канала
+      <textarea name="bio" rows="4" placeholder="О вашем канале">{{ profile_user.bio or '' }}</textarea>
+    </label>
+    <button type="submit">Сохранить</button>
+  </form>
+</div>
+{% endblock %}

@@ -209,3 +209,9 @@ def moderate_thumbnail_with_ai(thumb_path: str) -> tuple[bool, str | None, float
         except RuntimeError:
             pass
         return True, "moderation_error", 0.0
+
+
+
+def allowed_image_file(filename: str) -> bool:
+    allowed_extensions = {"jpg", "jpeg", "png", "webp"}
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in allowed_extensions

@@ -8,7 +8,10 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="{{ url_for('main.index') }}">▶ YouClone</a>
+    <button class="icon-btn" id="sidebar-toggle" type="button" aria-label="Скрыть меню">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z"/></svg>
+    </button>
+    <a class="logo" href="{{ url_for('main.index') }}">YouClone</a>
     <form class="search" method="get" action="{{ url_for('main.index') }}">
       <input name="q" value="{{ request.args.get('q', '') }}" placeholder="Введите запрос" />
       <button type="submit">Поиск</button>
@@ -25,12 +28,13 @@
     </nav>
   </header>
 
-  <div class="layout">
-    <aside class="sidebar">
+  <div class="layout" id="app-layout">
+    <aside class="sidebar" id="app-sidebar">
       <a class="side-link {% if request.args.get('tab', 'home') == 'home' %}active{% endif %}" href="{{ url_for('main.index', tab='home', q=request.args.get('q', '')) }}">Главная</a>
       <a class="side-link {% if request.args.get('tab') == 'subscriptions' %}active{% endif %}" href="{{ url_for('main.index', tab='subscriptions', q=request.args.get('q', '')) }}">Подписки</a>
       {% if current_user.is_authenticated %}
       <a class="side-link" href="{{ url_for('main.profile', username=current_user.username) }}">Ваш канал</a>
+      <a class="side-link" href="{{ url_for('main.edit_profile', username=current_user.username) }}">Настройки канала</a>
       {% endif %}
     </aside>
 

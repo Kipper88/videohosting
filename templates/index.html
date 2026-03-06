@@ -16,13 +16,18 @@
         </video>
         <div class="thumb-preview-controls" data-hover-controls>
           <input type="range" min="0" max="1000" value="0" step="1" data-hover-progress />
-          <button type="button" class="mini-mute-btn" data-hover-mute>🔇</button>
+          <button type="button" class="mini-mute-btn" data-hover-mute>
+            <svg viewBox="0 0 24 24"><path d="M14 5v14l-6-4H4V9h4l6-4Zm3.5 7a3.5 3.5 0 0 0-1.2-2.64l1.42-1.42A5.5 5.5 0 0 1 19.5 12a5.5 5.5 0 0 1-1.78 4.06l-1.42-1.42A3.5 3.5 0 0 0 17.5 12Z"/></svg>
+          </button>
         </div>
       </a>
       <div class="video-info">
-        <a class="title" href="{{ url_for('main.video_detail', video_id=video.id) }}">{{ video.title }}</a>
-        <a class="author" href="{{ url_for('main.profile', username=video.author.username) if video.author else '#' }}">{{ video.author.username if video.author else 'Анонимный автор' }}</a>
-        <p class="meta">{{ video.views }} просмотров • {{ video.created_at.strftime('%d.%m.%Y') }}</p>
+        <img class="avatar-sm" src="{% if video.author and video.author.avatar_url %}{{ url_for('main.uploaded_file', filename=video.author.avatar_url) }}{% else %}{{ url_for('static', filename='img/default-avatar.svg') }}{% endif %}" alt="avatar" />
+        <div>
+          <a class="title" href="{{ url_for('main.video_detail', video_id=video.id) }}">{{ video.title }}</a>
+          <a class="author" href="{{ url_for('main.profile', username=video.author.username) if video.author else '#' }}">{{ video.author.username if video.author else 'Анонимный автор' }}</a>
+          <p class="meta">{{ video.views }} просмотров • {{ video.created_at.strftime('%d.%m.%Y') }}</p>
+        </div>
       </div>
     </article>
   {% else %}

@@ -21,6 +21,7 @@ from services import (
     generate_thumbnail,
     moderate_thumbnail_with_ai,
     moderate_video_content_with_ai,
+    allowed_image_file,
 )
 from video_logic import add_comment, get_home_feed, get_related_videos, toggle_reaction
 
@@ -215,6 +216,41 @@ def profile(username: str):
         subscriptions_count=subscriptions_count,
     )
 
+
+
+
+@bp.route("/u/<string:username>/edit", methods=["GET", "POST"], endpoint="edit_profile")
+@login_required
+def edit_profile(username: str):
+    user = User.query.filter_by(username=username).first_or_404()
+    if user.id != current_user.id:
+        flash("Можно редактировать только свой профиль.", "error")
+        return redirect(url_for("main.profile", username=username))
+
+    if request.method == "POST":
+        bio = request.form.get("bio", "").strip()
+        avatar = request.files.get("avatar")
+
+        user.bio = bio[:500] if bio else None
+
+        if avatar and avatar.filename:
+            if not allowed_image_file(avatar.filename):
+                flash("Недопустимый формат аватара. Разрешены: jpg, jpeg, png, webp.", "error")
+                return redirect(url_for("main.edit_profile", username=username))
+
+            avatar_dir = os.path.join(current_app.config["UPLOAD_FOLDER"], "avatars")
+            os.makedirs(avatar_dir, exist_ok=True)
+            safe_name = secure_filename(avatar.filename)
+            avatar_filename = f"{int(datetime.utcnow().timestamp())}_{safe_name}"
+            avatar_path = os.path.join(avatar_dir, avatar_filename)
+            avatar.save(avatar_path)
+            user.avatar_url = f"avatars/{avatar_filename}"
+
+        db.session.commit()
+        flash("Профиль обновлён.", "success")
+        return redirect(url_for("main.profile", username=username))
+
+    return render_template("profile_edit.html", profile_user=user)
 
 @bp.route("/u/<string:username>/subscribe", methods=["POST"], endpoint="toggle_subscribe")
 @login_required
