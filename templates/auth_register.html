@@ -1,0 +1,46 @@
+{% extends "base.html" %} {% block title %}Регистрация · Видеохостинг{% endblock
+%} {% block content %}
+<div class="card" style="max-width: 420px; margin: 0 auto">
+	<h1 style="margin-top: 0; margin-bottom: 16px">Регистрация</h1>
+
+	<form method="post">
+		<label for="username">Никнейм</label>
+		<input
+			type="text"
+			id="username"
+			name="username"
+			required
+			placeholder="nickname"
+		/>
+
+		<label for="email">Email</label>
+		<input
+			type="text"
+			id="email"
+			name="email"
+			required
+			placeholder="you@example.com"
+		/>
+
+		<label for="password">Пароль</label>
+		<input type="password" id="password" name="password" required />
+
+		<label for="password2">Повторите пароль</label>
+		<input type="password" id="password2" name="password2" required />
+
+		<div
+			style="
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-top: 8px;
+			"
+		>
+			<button type="submit" class="btn">Создать аккаунт</button>
+			<a href="{{ url_for('auth.login') }}" class="btn btn-secondary"
+				>У меня уже есть аккаунт</a
+			>
+		</div>
+	</form>
+</div>
+{% endblock %}

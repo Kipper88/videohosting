@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+	<head>
+		<meta charset="utf-8" />
+		<title>{% block title %}Видеохостинг{% endblock %}</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<style>
+			body {
+				font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+					sans-serif;
+				margin: 0;
+				padding: 0;
+				background: #0f172a;
+				color: #e5e7eb;
+			}
+			header {
+				background: #020617;
+				border-bottom: 1px solid #1e293b;
+				padding: 12px 24px;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+			}
+			header a {
+				color: #e5e7eb;
+				text-decoration: none;
+				margin-right: 16px;
+				font-weight: 500;
+			}
+			header a:hover {
+				color: #38bdf8;
+			}
+			.container {
+				max-width: 960px;
+				margin: 0 auto;
+				padding: 24px 16px 40px;
+			}
+			.card {
+				background: #020617;
+				border-radius: 12px;
+				border: 1px solid #1e293b;
+				padding: 20px;
+				box-shadow: 0 18px 45px rgba(15, 23, 42, 0.7);
+			}
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+				gap: 16px;
+			}
+			.btn {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				padding: 8px 16px;
+				border-radius: 999px;
+				border: none;
+				cursor: pointer;
+				font-weight: 500;
+				background: linear-gradient(135deg, #38bdf8, #6366f1);
+				color: #020617;
+				text-decoration: none;
+				transition: transform 0.08s ease, box-shadow 0.08s ease;
+				box-shadow: 0 8px 20px rgba(56, 189, 248, 0.35);
+			}
+			.btn:hover {
+				transform: translateY(-1px);
+				box-shadow: 0 12px 25px rgba(56, 189, 248, 0.4);
+			}
+			.btn-secondary {
+				background: transparent;
+				color: #e5e7eb;
+				border: 1px solid #334155;
+				box-shadow: none;
+			}
+			.btn-secondary:hover {
+				background: #020617;
+			}
+			.muted {
+				color: #9ca3af;
+				font-size: 0.9rem;
+			}
+			.flash-container {
+				position: fixed;
+				top: 16px;
+				right: 16px;
+				z-index: 50;
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+			}
+			.flash {
+				background: rgba(15, 23, 42, 0.96);
+				border-radius: 12px;
+				border: 1px solid #22c55e;
+				color: #bbf7d0;
+				padding: 10px 14px;
+				font-size: 0.9rem;
+				box-shadow: 0 18px 45px rgba(15, 23, 42, 0.9);
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			}
+			.flash-error {
+				border-color: #f97373;
+				color: #fecaca;
+			}
+			.flash-info {
+				border-color: #38bdf8;
+				color: #e0f2fe;
+			}
+			.flash-close {
+				margin-left: auto;
+				cursor: pointer;
+				color: #64748b;
+				font-size: 0.9rem;
+			}
+			form label {
+				display: block;
+				margin-bottom: 4px;
+				font-size: 0.9rem;
+				color: #cbd5f5;
+			}
+			input[type="text"],
+			input[type="file"] {
+				width: 100%;
+				padding: 8px 10px;
+				border-radius: 8px;
+				border: 1px solid #334155;
+				background: #020617;
+				color: #e5e7eb;
+				margin-bottom: 12px;
+			}
+			input[type="text"]:focus,
+			input[type="file"]:focus {
+				outline: none;
+				border-color: #38bdf8;
+				box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.5);
+			}
+			video {
+				width: 100%;
+				border-radius: 12px;
+				background: #020617;
+			}
+			.video-card {
+				background: rgba(15, 23, 42, 0.9);
+				border-radius: 12px;
+				border: 1px solid #1e293b;
+				padding: 10px 10px 12px;
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+				cursor: pointer;
+				transition: transform 0.08s ease, box-shadow 0.08s ease,
+					border-color 0.08s ease;
+			}
+			.video-card:hover {
+				transform: translateY(-2px);
+				box-shadow: 0 16px 35px rgba(15, 23, 42, 0.8);
+				border-color: #334155;
+			}
+			.video-thumb-wrapper {
+				position: relative;
+				width: 100%;
+				overflow: hidden;
+				border-radius: 10px;
+				background: #020617;
+				aspect-ratio: 16 / 9;
+			}
+			.video-thumb-image,
+			.video-thumb-preview {
+				position: absolute;
+				inset: 0;
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				border-radius: 10px;
+			}
+			.video-thumb-preview {
+				display: none;
+			}
+			.video-card:hover .video-thumb-preview {
+				display: block;
+			}
+			.video-card:hover .video-thumb-image {
+				display: none;
+			}
+			.video-title {
+				font-weight: 500;
+				font-size: 0.98rem;
+			}
+			.video-meta {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				font-size: 0.82rem;
+				color: #9ca3af;
+			}
+			.pill {
+				border-radius: 999px;
+				border: 1px solid #334155;
+				padding: 3px 10px;
+				font-size: 0.8rem;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<div>
+				<a href="{{ url_for('main.index') }}">Видеохостинг</a>
+			</div>
+			<div>
+				<a class="btn" href="{{ url_for('main.upload') }}">+ Загрузить</a>
+				{% if current_user.is_authenticated %}
+				<a href="{{ url_for('main.profile', username=current_user.username) }}"
+					>{{ current_user.username }}</a
+				>
+				<a href="{{ url_for('auth.logout') }}">Выйти</a>
+				{% else %}
+				<a href="{{ url_for('auth.login') }}">Войти</a>
+				{% endif %}
+			</div>
+		</header>
+		<main class="container">{% block content %}{% endblock %}</main>
+
+		<div class="flash-container" id="flash-container">
+			{% with messages = get_flashed_messages(with_categories=true) %} {% if
+			messages %} {% for category, message in messages %}
+			<div
+				class="flash {% if category == 'error' %}flash-error{% elif category == 'info' %}flash-info{% endif %}"
+			>
+				<span>{{ message }}</span>
+				<span class="flash-close" onclick="this.parentElement.remove()">✕</span>
+			</div>
+			{% endfor %} {% endif %} {% endwith %}
+		</div>
+
+		<script>
+			// Авто-сокрытие уведомлений
+			window.addEventListener("load", () => {
+				const flashes = document.querySelectorAll("#flash-container .flash");
+				flashes.forEach((el, idx) => {
+					setTimeout(() => {
+						el.style.opacity = "0";
+						el.style.transform = "translateY(-4px)";
+						setTimeout(() => el.remove(), 300);
+					}, 3500 + idx * 300);
+				});
+			});
+		</script>
+
+		{% block scripts %}{% endblock %}
+	</body>
+</html>

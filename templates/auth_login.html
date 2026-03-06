@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Вход · Видеохостинг{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:420px;margin:0 auto;">
+    <h1 style="margin-top:0;margin-bottom:16px;">Вход</h1>
+
+    <form method="post">
+        <label for="login">Email или ник</label>
+        <input type="text" id="login" name="login" required placeholder="user@example.com или nickname">
+
+        <label for="password">Пароль</label>
+        <input type="password" id="password" name="password" required>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+            <button type="submit" class="btn">Войти</button>
+            <a href="{{ url_for('auth.register') }}" class="btn btn-secondary">Регистрация</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+
