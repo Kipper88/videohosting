@@ -3,6 +3,7 @@ from datetime import datetime
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
 
+
 db = SQLAlchemy()
 
 
@@ -18,6 +19,7 @@ class User(UserMixin, db.Model):
     avatar_url = db.Column(db.String(255), nullable=True)
 
     videos = db.relationship("Video", back_populates="author", lazy="dynamic")
+    comments = db.relationship("VideoComment", back_populates="author", lazy="dynamic")
     subscribers = db.relationship(
         "Subscription",
         foreign_keys="Subscription.followed_id",
@@ -38,9 +40,11 @@ class Video(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
     filename = db.Column(db.String(255), nullable=False, unique=True)
     thumbnail_filename = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    views = db.Column(db.Integer, default=0, nullable=False)
     likes = db.Column(db.Integer, default=0, nullable=False)
     dislikes = db.Column(db.Integer, default=0, nullable=False)
     is_approved = db.Column(db.Boolean, default=True, nullable=False)
@@ -49,20 +53,18 @@ class Video(db.Model):
 
     author = db.relationship("User", back_populates="videos")
     reactions = db.relationship("VideoReaction", back_populates="video", lazy="dynamic")
+    comments = db.relationship(
+        "VideoComment", back_populates="video", lazy="dynamic", cascade="all, delete-orphan"
+    )
 
 
 class VideoReaction(db.Model):
-    """
-    Лайки/дизлайки к видео.
-    value: +1 — лайк, -1 — дизлайк.
-    """
-
     __tablename__ = "video_reactions"
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     video_id = db.Column(db.Integer, db.ForeignKey("videos.id"), nullable=False)
-    value = db.Column(db.Integer, nullable=False)  # 1 или -1
+    value = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user = db.relationship("User")
@@ -73,12 +75,20 @@ class VideoReaction(db.Model):
     )
 
 
-class Subscription(db.Model):
-    """
-    Подписки на авторов.
-    follower_id подписан на followed_id.
-    """
+class VideoComment(db.Model):
+    __tablename__ = "video_comments"
 
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    video_id = db.Column(db.Integer, db.ForeignKey("videos.id"), nullable=False)
+    text = db.Column(db.String(1000), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    author = db.relationship("User", back_populates="comments")
+    video = db.relationship("Video", back_populates="comments")
+
+
+class Subscription(db.Model):
     __tablename__ = "subscriptions"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -95,7 +105,15 @@ class Subscription(db.Model):
 
 
 def init_db(app) -> None:
-    """Создать таблицы БД."""
     with app.app_context():
         db.create_all()
 
+        conn = db.engine.connect()
+        try:
+            video_columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(videos)")}
+            if "description" not in video_columns:
+                conn.exec_driver_sql("ALTER TABLE videos ADD COLUMN description TEXT")
+            if "views" not in video_columns:
+                conn.exec_driver_sql("ALTER TABLE videos ADD COLUMN views INTEGER DEFAULT 0")
+        finally:
+            conn.close()
