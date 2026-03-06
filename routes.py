@@ -16,7 +16,12 @@ from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
 from models import Subscription, User, Video, VideoComment, VideoReaction, db
-from services import allowed_file, generate_thumbnail, moderate_thumbnail_with_ai
+from services import (
+    allowed_file,
+    generate_thumbnail,
+    moderate_thumbnail_with_ai,
+    moderate_video_content_with_ai,
+)
 from video_logic import add_comment, get_home_feed, get_related_videos, toggle_reaction
 
 bp = Blueprint("main", __name__)
@@ -71,15 +76,35 @@ def upload():
     moderation_label = None
     moderation_score = None
 
-    if thumbnail_ok:
-        is_approved, moderation_label, moderation_score = moderate_thumbnail_with_ai(thumb_path)
+    is_video_approved, video_moderation_label, video_moderation_score, checked_frames = moderate_video_content_with_ai(
+        save_path,
+        sample_count=5,
+    )
 
-    if not is_approved:
+    if not is_video_approved:
         for path in [save_path, thumb_path]:
             if os.path.exists(path):
                 os.remove(path)
-        flash("Видео отклонено модерацией ИИ.", "error")
+        flash(
+            f"Видео отклонено AI-модерацией на одном из участков (проверено кадров: {checked_frames}).",
+            "error",
+        )
         return redirect(url_for("main.upload"))
+
+    moderation_label = video_moderation_label
+    moderation_score = video_moderation_score
+
+    if thumbnail_ok:
+        is_approved, thumb_label, thumb_score = moderate_thumbnail_with_ai(thumb_path)
+        if not is_approved:
+            for path in [save_path, thumb_path]:
+                if os.path.exists(path):
+                    os.remove(path)
+            flash("Видео отклонено AI-модерацией превью.", "error")
+            return redirect(url_for("main.upload"))
+
+        moderation_label = f"{video_moderation_label}+{thumb_label}"
+        moderation_score = max(video_moderation_score or 0.0, thumb_score or 0.0)
 
     video = Video(
         user_id=current_user.id,

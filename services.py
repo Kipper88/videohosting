@@ -1,5 +1,7 @@
 import os
 import subprocess
+import tempfile
+from pathlib import Path
 
 import nudenet
 from flask import current_app
@@ -43,6 +45,39 @@ def get_video_duration(video_path: str) -> float | None:
         return None
 
 
+def _extract_frame(video_path: str, frame_path: str, timestamp: float) -> bool:
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-ss",
+                f"{timestamp:.3f}",
+                "-i",
+                video_path,
+                "-vframes",
+                "1",
+                frame_path,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        return result.returncode == 0 and os.path.exists(frame_path)
+    except Exception:
+        return False
+
+
+def _classify_frame(frame_path: str) -> tuple[bool, float]:
+    if nude_classifier is None:
+        return True, 0.0
+
+    result = nude_classifier.classify(frame_path)
+    data = result.get(frame_path, {})
+    unsafe_score = float(data.get("unsafe", 0.0))
+    return unsafe_score < 0.5, unsafe_score
+
+
 def generate_thumbnail(video_path: str, thumb_path: str) -> bool:
     try:
         duration = get_video_duration(video_path)
@@ -59,20 +94,64 @@ def generate_thumbnail(video_path: str, thumb_path: str) -> bool:
         return False
 
 
+def moderate_video_content_with_ai(
+    video_path: str,
+    sample_count: int = 5,
+) -> tuple[bool, str | None, float | None, int]:
+    """
+    Модерация по нескольким участкам видео.
+    Возвращает: allowed, label, max_score, checked_frames.
+    """
+    if nude_classifier is None:
+        return True, "skipped_no_local_model", 0.0, 0
+
+    duration = get_video_duration(video_path)
+    if not duration or duration <= 0:
+        return True, "skipped_no_duration", 0.0, 0
+
+    checked_frames = 0
+    max_unsafe_score = 0.0
+
+    # Проверяем равномерно по ролику, избегая самых краёв.
+    timestamps = []
+    for i in range(sample_count):
+        ratio = (i + 1) / (sample_count + 1)
+        timestamps.append(max(min(duration * ratio, duration - 0.2), 0.2))
+
+    with tempfile.TemporaryDirectory(prefix="vh_moderation_") as tmp_dir:
+        for index, ts in enumerate(timestamps, start=1):
+            frame_path = str(Path(tmp_dir) / f"frame_{index}.jpg")
+            if not _extract_frame(video_path, frame_path, ts):
+                continue
+
+            checked_frames += 1
+            try:
+                allowed, unsafe_score = _classify_frame(frame_path)
+            except Exception:
+                try:
+                    current_app.logger.exception("Ошибка AI-модерации кадра")
+                except RuntimeError:
+                    pass
+                continue
+
+            max_unsafe_score = max(max_unsafe_score, unsafe_score)
+            if not allowed:
+                return False, "unsafe_video_segment", unsafe_score, checked_frames
+
+    if checked_frames == 0:
+        return True, "skipped_no_frames", 0.0, 0
+
+    return True, "safe_video_segments", max_unsafe_score, checked_frames
+
+
 def moderate_thumbnail_with_ai(thumb_path: str) -> tuple[bool, str | None, float | None]:
     if nude_classifier is None:
         return True, "skipped_no_local_model", 0.0
 
     try:
-        result = nude_classifier.classify(thumb_path)
-        data = result.get(thumb_path, {})
-        unsafe_score = float(data.get("unsafe", 0.0))
-        safe_score = float(data.get("safe", 0.0))
-
-        allowed = unsafe_score < 0.5
-        label = "unsafe" if not allowed else "safe"
-        score = unsafe_score if not allowed else safe_score
-        return allowed, label, score
+        allowed, unsafe_score = _classify_frame(thumb_path)
+        label = "safe" if allowed else "unsafe"
+        return allowed, label, unsafe_score
     except Exception:
         try:
             current_app.logger.exception("Ошибка во время модерации превью")

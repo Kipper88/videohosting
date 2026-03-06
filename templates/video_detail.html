@@ -3,10 +3,36 @@
 {% block content %}
 <div class="watch-layout">
   <section>
-    <div class="player-frame">
-      <video class="player" controls preload="metadata" poster="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% endif %}">
+    <div class="player-frame custom-player" data-player>
+      <video
+        class="player"
+        preload="metadata"
+        poster="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% endif %}"
+        data-main-video
+      >
         <source src="{{ url_for('main.uploaded_file', filename=video.filename) }}" type="video/mp4" />
       </video>
+
+      <video class="timeline-preview-video" muted preload="metadata" aria-hidden="true" data-preview-video>
+        <source src="{{ url_for('main.uploaded_file', filename=video.filename) }}" type="video/mp4" />
+      </video>
+
+      <div class="player-controls" data-controls>
+        <button type="button" class="control-btn" data-play-toggle>▶</button>
+        <div class="progress-wrap" data-progress-wrap>
+          <div class="timeline-preview-popover" data-preview-popover>
+            <canvas width="240" height="135" data-preview-canvas></canvas>
+            <span data-preview-time>0:00</span>
+          </div>
+          <input type="range" min="0" max="1000" value="0" step="1" class="progress-input" data-progress />
+        </div>
+        <span class="time-label" data-time-label>0:00 / 0:00</span>
+      </div>
+    </div>
+
+    <div class="storyboard-strip" data-storyboard-strip>
+      <div class="storyboard-title">Шорткаты по видео</div>
+      <div class="storyboard-track" data-storyboard-track></div>
     </div>
 
     <h1 class="watch-title">{{ video.title }}</h1>

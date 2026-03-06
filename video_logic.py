@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 
-from models import Subscription, Video, VideoComment, VideoReaction, db
+from models import Subscription, User, Video, VideoComment, VideoReaction, db
 
 
 def get_home_feed(search: str | None, only_subscriptions: bool, viewer_id: int | None):
-    query = Video.query.filter_by(is_approved=True)
+    query = Video.query.filter_by(is_approved=True).outerjoin(User, Video.user_id == User.id)
 
     if search:
+        normalized = search.strip().lower()
         query = query.filter(
             or_(
-                Video.title.ilike(f"%{search}%"),
-                Video.description.ilike(f"%{search}%"),
+                func.lower(Video.title).contains(normalized),
+                func.lower(func.coalesce(Video.description, "")).contains(normalized),
+                func.lower(func.coalesce(User.username, "")).contains(normalized),
             )
         )
 
