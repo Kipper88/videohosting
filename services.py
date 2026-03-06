@@ -11,6 +11,14 @@ from config import Config
 nude_model = None
 model_mode = "none"
 
+UNSAFE_DETECTOR_LABELS = {
+    "FEMALE_BREAST_EXPOSED",
+    "FEMALE_GENITALIA_EXPOSED",
+    "MALE_GENITALIA_EXPOSED",
+    "ANUS_EXPOSED",
+    "BUTTOCKS_EXPOSED",
+}
+
 
 def _resolve_model_path() -> str | None:
     candidates = [Config.AI_MODEL_PATH, Config.AI_MODEL_PATH_FALLBACK]
@@ -106,9 +114,16 @@ def _classify_frame(frame_path: str) -> tuple[bool, float]:
     if model_mode == "detector":
         detections = nude_model.detect(frame_path) or []
         max_score = 0.0
+
         for detection in detections:
             score = float(detection.get("score", 0.0))
-            max_score = max(max_score, score)
+            label = str(detection.get("class", "")).upper()
+
+            # Для NudeDetector учитываем только действительно небезопасные классы,
+            # иначе безопасные детекции (например лицо) могут отклонять любой ролик.
+            if label in UNSAFE_DETECTOR_LABELS:
+                max_score = max(max_score, score)
+
         return max_score < threshold, max_score
 
     return True, 0.0
