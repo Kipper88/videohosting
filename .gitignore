@@ -5,6 +5,6 @@ __pycache__/
 .idea/
 .vscode/
 .continue/
-models_ai/
-uploads/
+models_ai/*
+uploads/*
 .editorconfig
