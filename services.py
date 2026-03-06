@@ -11,19 +11,10 @@ from config import Config
 nude_model = None
 model_mode = "none"
 
-
-def _resolve_model_path() -> str | None:
-    candidates = [Config.AI_MODEL_PATH, Config.AI_MODEL_PATH_FALLBACK]
-    for candidate in candidates:
-        if candidate and os.path.exists(candidate):
-            return candidate
-    return None
-
-
 def _init_nude_model():
     global model_mode
 
-    model_path = _resolve_model_path()
+    model_path = Config.AI_MODEL_PATH
 
     classifier_cls = getattr(nudenet, "NudeClassifier", None)
     if classifier_cls:
