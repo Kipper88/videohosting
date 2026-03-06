@@ -16,11 +16,11 @@ venv/
 .continue/
 
 # Uploads and generated files
-uploads/
+uploads/*
+!uploads/.gitkeep
 
-# AI models (large files)
-models_ai/
-
+models_ai/*
+!models_ai/.gitkeep
 # OS files
 .DS_Store
 Thumbs.db
