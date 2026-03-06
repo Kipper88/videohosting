@@ -1,86 +1,90 @@
-<!DOCTYPE html>
-<html lang="ru">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>{{ video.title }} · Видеохостинг</title>
-		<link
-			rel="stylesheet"
-			href="{{ url_for('static', filename='styles.css') }}"
-		/>
-	</head>
-	<body>
-		<header>
-			<div class="container">
-				<a href="/" class="logo">Видеохостинг</a>
-				<nav>
-					<ul>
-						<li><a href="/">Главная</a></li>
-						<li><a href="/videos/new">Загрузить</a></li>
-						<li><a href="/login">Войти</a></li>
-					</ul>
-				</nav>
-			</div>
-		</header>
-		<main>
-			<div class="container">
-				<div class="video-container">
-					<video
-						controls
-						preload="metadata"
-						poster="{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}"
-					>
-						<source
-							src="{{ url_for('main.uploaded_file', filename=video.filename) }}"
-							type="video/mp4"
-						/>
-						Ваш браузер не поддерживает видео.
-					</video>
-				</div>
-				<div class="video-info">
-					<h1>{{ video.title }}</h1>
-					<div class="meta">
-						<span
-							>Загружено {{ video.created_at.strftime("%d.%m.%Y %H:%M") }}</span
-						>
-						<span>❤ {{ video.likes }}</span>
-					</div>
-					<div class="description">{{ video.description }}</div>
-					<div class="controls">
-						<button class="btn like-btn" data-video-id="{{ video.id }}">
-							❤ <span class="likes-count">{{ video.likes }}</span>
-						</button>
-						<button
-							class="btn btn-secondary dislike-btn"
-							data-video-id="{{ video.id }}"
-						>
-							👎 <span class="dislikes-count">{{ video.dislikes }}</span>
-						</button>
-					</div>
-					<div class="comments">
-						<h2>Комментарии</h2>
-						{% for comment in comments %}
-						<div class="comment">
-							<p>{{ comment.text }}</p>
-							<span>— {{ comment.user }}</span>
-						</div>
-						{% endfor %}
-						<form method="post" action="/video/{{ video.id }}/comments">
-							<textarea
-								name="text"
-								placeholder="Добавьте комментарий"
-							></textarea>
-							<button type="submit" class="btn">Оставить комментарий</button>
-						</form>
-					</div>
-				</div>
-			</div>
-		</main>
-		<footer>
-			<div class="container">
-				<p>&copy; 2023 Видеохостинг. Все права защищены.</p>
-			</div>
-		</footer>
-		<script src="{{ url_for('static', filename='script.js') }}"></script>
-	</body>
-</html>
+{% extends "base.html" %}
+{% block title %}{{ video.title }} · YouClone{% endblock %}
+{% block content %}
+<div class="watch-layout">
+  <section>
+    <div class="player-frame custom-player" data-player>
+      <video
+        class="player"
+        preload="metadata"
+        poster="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% endif %}"
+        data-main-video
+      >
+        <source src="{{ url_for('main.uploaded_file', filename=video.filename) }}" type="video/mp4" />
+      </video>
+
+      <video class="timeline-preview-video" muted preload="metadata" aria-hidden="true" data-preview-video>
+        <source src="{{ url_for('main.uploaded_file', filename=video.filename) }}" type="video/mp4" />
+      </video>
+
+      <div class="player-controls" data-controls>
+        <button type="button" class="control-btn" data-play-toggle>▶</button>
+        <div class="progress-wrap" data-progress-wrap>
+          <div class="timeline-preview-popover" data-preview-popover>
+            <canvas width="240" height="135" data-preview-canvas></canvas>
+            <span data-preview-time>0:00</span>
+          </div>
+          <input type="range" min="0" max="1000" value="0" step="1" class="progress-input" data-progress />
+        </div>
+        <span class="time-label" data-time-label>0:00 / 0:00</span>
+      </div>
+    </div>
+
+    <div class="storyboard-strip" data-storyboard-strip>
+      <div class="storyboard-title">Шорткаты по видео</div>
+      <div class="storyboard-track" data-storyboard-track></div>
+    </div>
+
+    <h1 class="watch-title">{{ video.title }}</h1>
+    <div class="watch-meta">
+      <a href="{{ url_for('main.profile', username=video.author.username) if video.author else '#' }}">{{ video.author.username if video.author else 'Анонимный автор' }}</a>
+      <span>{{ video.views }} просмотров</span>
+      <span>{{ video.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+    </div>
+
+    <div class="actions" data-video-id="{{ video.id }}">
+      <button class="react-btn {% if user_reaction == 1 %}active{% endif %}" data-action="like">👍 <span class="likes-count">{{ video.likes }}</span></button>
+      <button class="react-btn {% if user_reaction == -1 %}active{% endif %}" data-action="dislike">👎 <span class="dislikes-count">{{ video.dislikes }}</span></button>
+    </div>
+
+    {% if video.description %}
+      <p class="description">{{ video.description }}</p>
+    {% endif %}
+
+    <section class="comments">
+      <h2>Комментарии ({{ comments|length }})</h2>
+      {% if current_user.is_authenticated %}
+      <form method="post" action="{{ url_for('main.video_comment', video_id=video.id) }}">
+        <textarea name="text" required placeholder="Оставьте комментарий"></textarea>
+        <button type="submit">Отправить</button>
+      </form>
+      {% else %}
+      <p class="muted">Чтобы комментировать, войдите в аккаунт.</p>
+      {% endif %}
+
+      {% for comment in comments %}
+      <div class="comment-item">
+        <strong>{{ comment.author.username }}</strong>
+        <span>{{ comment.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+        <p>{{ comment.text }}</p>
+      </div>
+      {% else %}
+      <p class="muted">Пока нет комментариев.</p>
+      {% endfor %}
+    </section>
+  </section>
+
+  <aside class="related">
+    <h3>Следующее</h3>
+    {% for item in related_videos %}
+      <a class="related-card" href="{{ url_for('main.video_detail', video_id=item.id) }}">
+        <img src="{% if item.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=item.thumbnail_filename) }}{% else %}{{ url_for('main.uploaded_file', filename=item.filename) }}{% endif %}" alt="{{ item.title }}" />
+        <div>
+          <div class="title">{{ item.title }}</div>
+          <div class="meta">{{ item.views }} просмотров</div>
+        </div>
+      </a>
+    {% endfor %}
+  </aside>
+</div>
+{% endblock %}
