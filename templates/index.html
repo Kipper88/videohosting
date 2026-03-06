@@ -1,151 +1,25 @@
-{% extends "base.html" %} {% block title %}Список видео · Видеохостинг{%
-endblock %} {% block content %}
-<div class="card">
-	<div
-		style="
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			margin-bottom: 16px;
-		"
-	>
-		<div>
-			<div class="muted">
-				{% if videos %} Всего {{ videos|length }} видео {% else %} Пока нет ни
-				одного видео — загрузите первое! {% endif %}
-			</div>
-		</div>
-	</div>
+{% extends "base.html" %}
+{% block title %}Главная · YouClone{% endblock %}
+{% block content %}
+<section class="feed-header">
+  <h1>{% if tab == 'subscriptions' %}Лента подписок{% else %}Рекомендации{% endif %}</h1>
+  <span>{{ videos|length }} видео</span>
+</section>
 
-	{% if videos %}
-	<div class="grid">
-		{% for video in videos %}
-		<a
-			href="{{ url_for('main.video_detail', video_id=video.id) }}"
-			style="text-decoration: none; color: inherit"
-		>
-			<div class="video-card" data-video-id="{{ video.id }}">
-				<div class="video-thumb-wrapper">
-					<img
-						class="video-thumb-image"
-						src="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% else %}{{ url_for('main.uploaded_file', filename=video.filename) }}{% endif %}"
-						alt="{{ video.title }}"
-					/>
-					<video
-						class="video-thumb-preview"
-						muted
-						preload="metadata"
-						src="{{ url_for('main.uploaded_file', filename=video.filename) }}"
-					></video>
-				</div>
-				<div class="video-title">{{ video.title }}</div>
-				<div class="video-meta">
-					<span>{{ video.created_at.strftime("%d.%m.%Y %H:%M") }}</span>
-				</div>
-			</div>
-		</a>
-		{% endfor %}
-	</div>
-	{% endif %}
-</div>
-{% endblock %} {% block scripts %}
-<script>
-	document.addEventListener("DOMContentLoaded", function () {
-		const cards = document.querySelectorAll(".video-card");
-
-		cards.forEach((card) => {
-			const preview = card.querySelector(".video-thumb-preview");
-			const wrapper = card.querySelector(".video-thumb-wrapper");
-			if (preview && wrapper) {
-				let duration = 0;
-				let hoverTimeout;
-
-				preview.addEventListener("loadedmetadata", () => {
-					duration = preview.duration || 0;
-				});
-
-				card.addEventListener("mouseenter", () => {
-					hoverTimeout = setTimeout(() => {
-						try {
-							if (duration > 0) {
-								preview.currentTime = 0;
-							}
-							preview.play().catch(() => {});
-						} catch (e) {}
-					}, 120);
-				});
-
-				card.addEventListener("mouseleave", () => {
-					clearTimeout(hoverTimeout);
-					try {
-						preview.pause();
-						preview.currentTime = 0;
-					} catch (e) {}
-				});
-
-				wrapper.addEventListener("mousemove", (event) => {
-					if (!duration || duration === Infinity) return;
-					const rect = wrapper.getBoundingClientRect();
-					const relativeX = Math.min(
-						Math.max(event.clientX - rect.left, 0),
-						rect.width
-					);
-					const ratio = rect.width > 0 ? relativeX / rect.width : 0;
-					const targetTime = duration * ratio;
-					try {
-						preview.currentTime = targetTime;
-					} catch (e) {}
-				});
-			}
-		});
-
-		async function sendReaction(videoId, action) {
-			try {
-				const res = await fetch(`/api/videos/${videoId}/react`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						"X-Requested-With": "XMLHttpRequest",
-					},
-					body: JSON.stringify({ action }),
-					credentials: "same-origin",
-				});
-				if (!res.ok) return;
-				const data = await res.json();
-				document
-					.querySelectorAll(
-						`.video-card [data-video-id="${videoId}"] .likes-count`
-					)
-					.forEach((el) => {
-						el.textContent = data.likes;
-					});
-				document
-					.querySelectorAll(
-						`.video-card [data-video-id="${videoId}"] .dislikes-count`
-					)
-					.forEach((el) => {
-						el.textContent = data.dislikes;
-					});
-			} catch (e) {
-				console.error(e);
-			}
-		}
-
-		document.querySelectorAll(".like-btn").forEach((btn) => {
-			btn.addEventListener("click", (e) => {
-				e.preventDefault();
-				const vid = btn.getAttribute("data-video-id");
-				if (vid) sendReaction(vid, "like");
-			});
-		});
-
-		document.querySelectorAll(".dislike-btn").forEach((btn) => {
-			btn.addEventListener("click", (e) => {
-				e.preventDefault();
-				const vid = btn.getAttribute("data-video-id");
-				if (vid) sendReaction(vid, "dislike");
-			});
-		});
-	});
-</script>
+<section class="video-grid">
+  {% for video in videos %}
+    <article class="video-card">
+      <a href="{{ url_for('main.video_detail', video_id=video.id) }}">
+        <img class="thumb" src="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% else %}{{ url_for('main.uploaded_file', filename=video.filename) }}{% endif %}" alt="{{ video.title }}" />
+      </a>
+      <div class="video-info">
+        <a class="title" href="{{ url_for('main.video_detail', video_id=video.id) }}">{{ video.title }}</a>
+        <a class="author" href="{{ url_for('main.profile', username=video.author.username) if video.author else '#' }}">{{ video.author.username if video.author else 'Анонимный автор' }}</a>
+        <p class="meta">{{ video.views }} просмотров • {{ video.created_at.strftime('%d.%m.%Y') }}</p>
+      </div>
+    </article>
+  {% else %}
+    <p class="empty">Ничего не найдено. Попробуйте другой запрос.</p>
+  {% endfor %}
+</section>
 {% endblock %}
