@@ -19,6 +19,7 @@ venv/*
 uploads/*
 
 NudeNet/*
+NudeNet/classifier_model.onnx
 # OS files
 .DS_Store
 Thumbs.db
