@@ -1,10 +1,26 @@
-venv/
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
 .env
+
+# IDE
 .idea/
 .vscode/
+
+# AI assistant configs
 .continue/
-models_ai/*
-uploads/*
-.editorconfig
+
+# Uploads and generated files
+uploads/
+
+# AI models (large files)
+models_ai/
+
+# OS files
+.DS_Store
+Thumbs.db
