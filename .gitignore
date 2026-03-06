@@ -19,8 +19,8 @@ venv/
 uploads/*
 !uploads/.gitkeep
 
-models_ai/*
-!models_ai/.gitkeep
+NudeNet/*
+!NudeNet/.gitkeep
 # OS files
 .DS_Store
 Thumbs.db
