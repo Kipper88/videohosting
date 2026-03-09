@@ -20,23 +20,15 @@ UNSAFE_DETECTOR_LABELS = {
 }
 
 
-def _resolve_model_path() -> str | None:
-    candidates = [Config.AI_MODEL_PATH, Config.AI_MODEL_PATH_FALLBACK]
-    for candidate in candidates:
-        if candidate and os.path.exists(candidate):
-            return candidate
-    return None
-
-
 def _init_nude_model():
     global model_mode
 
-    model_path = _resolve_model_path()
+    model_path = Config.AI_MODEL_PATH
 
     classifier_cls = getattr(nudenet, "NudeClassifier", None)
     if classifier_cls:
         model_mode = "classifier"
-        return classifier_cls(model_path=model_path) if model_path else classifier_cls()
+        return classifier_cls()
 
     detector_cls = getattr(nudenet, "NudeDetector", None)
     if detector_cls:
