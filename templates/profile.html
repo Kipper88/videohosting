@@ -3,7 +3,7 @@
 {% block content %}
 <section class="feed-header profile-header">
   <div class="channel-head">
-    <img class="avatar-lg" src="{% if profile_user.avatar_url %}{{ url_for('main.uploaded_file', filename=profile_user.avatar_url) }}{% else %}{{ url_for('static', filename='img/default-avatar.svg') }}{% endif %}" alt="avatar" />
+    <img class="avatar-lg" src="{% if profile_user.avatar_url %}{{ url_for('main.uploaded_file', filename=profile_user.avatar_url) }}{% else %}{{ url_for('static', path='img/default-avatar.svg') }}{% endif %}" alt="avatar" />
     <div>
       <h1>@{{ profile_user.username }}</h1>
       <span>{{ subscribers_count }} подписчиков · {{ subscriptions_count }} подписок</span>

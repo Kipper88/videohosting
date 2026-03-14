@@ -22,7 +22,7 @@
         </div>
       </a>
       <div class="video-info">
-        <img class="avatar-sm" src="{% if video.author and video.author.avatar_url %}{{ url_for('main.uploaded_file', filename=video.author.avatar_url) }}{% else %}{{ url_for('static', filename='img/default-avatar.svg') }}{% endif %}" alt="avatar" />
+        <img class="avatar-sm" src="{% if video.author and video.author.avatar_url %}{{ url_for('main.uploaded_file', filename=video.author.avatar_url) }}{% else %}{{ url_for('static', path='img/default-avatar.svg') }}{% endif %}" alt="avatar" />
         <div>
           <a class="title" href="{{ url_for('main.video_detail', video_id=video.id) }}">{{ video.title }}</a>
           <a class="author" href="{{ url_for('main.profile', username=video.author.username) if video.author else '#' }}">{{ video.author.username if video.author else 'Анонимный автор' }}</a>
