@@ -1,51 +1,40 @@
-from flask import Flask
-from flask_login import LoginManager
+from __future__ import annotations
 
-from config import Config
-from models import db, init_db, User
-from routes import bp as main_bp
+import os
+
+from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
+
 from auth import auth_bp
+from config import Config
+from identity import resolve_current_user
+from main_routes import bp as main_bp
+from models import init_db
 
-login_manager = LoginManager()
-login_manager.login_view = "auth.login"
 
+def create_app() -> FastAPI:
+    app = FastAPI(title="YouClone")
+    app.add_middleware(SessionMiddleware, secret_key=Config.SECRET_KEY)
 
-def create_app() -> Flask:
-    app = Flask(__name__)
-    app.config.from_object(Config)
+    os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
+    app.state.upload_folder = Config.UPLOAD_FOLDER
 
-    # Расширения
-    db.init_app(app)
-    login_manager.init_app(app)
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    app.mount("/uploads", StaticFiles(directory=Config.UPLOAD_FOLDER), name="uploads")
 
-    # Гарантируем наличие каталога загрузок для локального хранения
-    import os
+    @app.middleware("http")
+    async def bind_current_user(request: Request, call_next):
+        request.state.current_user = await resolve_current_user(request)
+        return await call_next(request)
 
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    @app.on_event("startup")
+    async def on_startup() -> None:
+        await init_db()
 
-    # Инициализация БД
-    init_db(app)
-
-    # Роуты
-    app.register_blueprint(main_bp)
-    app.register_blueprint(auth_bp)
-
+    app.include_router(main_bp)
+    app.include_router(auth_bp)
     return app
 
 
-@login_manager.user_loader
-def load_user(user_id: str):
-    try:
-        return User.query.get(int(user_id))
-    except Exception:
-        return None
-
-
-if __name__ == "__main__":
-    app = create_app()
-    app.run(debug=True, host="127.0.0.1", port=5000)
-
-
-
-
-
+app = create_app()

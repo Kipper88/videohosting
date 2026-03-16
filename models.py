@@ -1,101 +1,111 @@
+from __future__ import annotations
+
 from datetime import datetime
 
-from flask_login import UserMixin
-from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-db = SQLAlchemy()
+from config import Config
 
 
-class User(UserMixin, db.Model):
+class Base(AsyncAttrs, DeclarativeBase):
+    pass
+
+
+class User(Base):
     __tablename__ = "users"
 
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    bio = db.Column(db.String(500), nullable=True)
-    avatar_url = db.Column(db.String(255), nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    bio: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    videos = db.relationship("Video", back_populates="author", lazy="dynamic")
-    subscribers = db.relationship(
-        "Subscription",
-        foreign_keys="Subscription.followed_id",
-        back_populates="followed",
-        lazy="dynamic",
-    )
-    subscriptions = db.relationship(
-        "Subscription",
-        foreign_keys="Subscription.follower_id",
-        back_populates="follower",
-        lazy="dynamic",
-    )
+    videos: Mapped[list[Video]] = relationship("Video", back_populates="author")
+    comments: Mapped[list[VideoComment]] = relationship("VideoComment", back_populates="author")
 
 
-class Video(db.Model):
+class Video(Base):
     __tablename__ = "videos"
 
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    title = db.Column(db.String(255), nullable=False)
-    filename = db.Column(db.String(255), nullable=False, unique=True)
-    thumbnail_filename = db.Column(db.String(255), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    likes = db.Column(db.Integer, default=0, nullable=False)
-    dislikes = db.Column(db.Integer, default=0, nullable=False)
-    is_approved = db.Column(db.Boolean, default=True, nullable=False)
-    moderation_label = db.Column(db.String(64), nullable=True)
-    moderation_score = db.Column(db.Float, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    thumbnail_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    views: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    likes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    dislikes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_approved: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    moderation_label: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    moderation_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    author = db.relationship("User", back_populates="videos")
-    reactions = db.relationship("VideoReaction", back_populates="video", lazy="dynamic")
+    author: Mapped[User | None] = relationship("User", back_populates="videos")
+    reactions: Mapped[list[VideoReaction]] = relationship("VideoReaction", back_populates="video")
+    comments: Mapped[list[VideoComment]] = relationship(
+        "VideoComment", back_populates="video", cascade="all, delete-orphan"
+    )
 
 
-class VideoReaction(db.Model):
-    """
-    Лайки/дизлайки к видео.
-    value: +1 — лайк, -1 — дизлайк.
-    """
-
+class VideoReaction(Base):
     __tablename__ = "video_reactions"
+    __table_args__ = (UniqueConstraint("user_id", "video_id", name="uix_user_video_reaction"),)
 
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    video_id = db.Column(db.Integer, db.ForeignKey("videos.id"), nullable=False)
-    value = db.Column(db.Integer, nullable=False)  # 1 или -1
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False)
+    value: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
-    user = db.relationship("User")
-    video = db.relationship("Video", back_populates="reactions")
-
-    __table_args__ = (
-        db.UniqueConstraint("user_id", "video_id", name="uix_user_video_reaction"),
-    )
+    video: Mapped[Video] = relationship("Video", back_populates="reactions")
 
 
-class Subscription(db.Model):
-    """
-    Подписки на авторов.
-    follower_id подписан на followed_id.
-    """
+class VideoComment(Base):
+    __tablename__ = "video_comments"
 
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False)
+    text: Mapped[str] = mapped_column(String(1000), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    author: Mapped[User] = relationship("User", back_populates="comments")
+    video: Mapped[Video] = relationship("Video", back_populates="comments")
+
+
+class Subscription(Base):
     __tablename__ = "subscriptions"
+    __table_args__ = (UniqueConstraint("follower_id", "followed_id", name="uix_follower_followed"),)
 
-    id = db.Column(db.Integer, primary_key=True)
-    follower_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    followed_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-
-    follower = db.relationship("User", foreign_keys=[follower_id], back_populates="subscriptions")
-    followed = db.relationship("User", foreign_keys=[followed_id], back_populates="subscribers")
-
-    __table_args__ = (
-        db.UniqueConstraint("follower_id", "followed_id", name="uix_follower_followed"),
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    follower_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    followed_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
-def init_db(app) -> None:
-    """Создать таблицы БД."""
-    with app.app_context():
-        db.create_all()
+def _to_async_db_uri(db_uri: str) -> str:
+    if db_uri.startswith("sqlite:///"):
+        return db_uri.replace("sqlite:///", "sqlite+aiosqlite:///")
+    if db_uri.startswith("postgresql://"):
+        return db_uri.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return db_uri
 
+
+DATABASE_URL = _to_async_db_uri(Config.SQLALCHEMY_DATABASE_URI)
+engine: AsyncEngine = create_async_engine(DATABASE_URL, future=True)
+SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+async def init_db() -> None:
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
+async def get_db_session():
+    async with SessionLocal() as session:
+        yield session

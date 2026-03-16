@@ -5,7 +5,7 @@ __pycache__/
 *.pyd
 
 # Virtual environment
-venv/
+venv/*
 .env
 
 # IDE
@@ -17,10 +17,9 @@ venv/
 
 # Uploads and generated files
 uploads/*
-!uploads/.gitkeep
 
-models_ai/*
-!models_ai/.gitkeep
+NudeNet/*
+NudeNet/classifier_model.onnx
 # OS files
 .DS_Store
 Thumbs.db

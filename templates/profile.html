@@ -1,69 +1,36 @@
-{% extends "base.html" %} {% block title %}{{ profile_user.username }} ·
-Профиль{% endblock %} {% block content %}
-<div class="card">
-	<div
-		style="
-			display: flex;
-			justify-content: space-between;
-			align-items: center;
-			margin-bottom: 16px;
-		"
-	>
-		<div>
-			<h1 style="margin-top: 0; margin-bottom: 4px">
-				{{ profile_user.username }}
-			</h1>
-			<div class="muted">
-				Подписчики: {{ subscribers_count }} · Подписки: {{ subscriptions_count
-				}}
-			</div>
-			{% if profile_user.bio %}
-			<p class="muted" style="margin-top: 8px; max-width: 600px">
-				{{ profile_user.bio }}
-			</p>
-			{% endif %}
-		</div>
-		<div>
-			{% if current_user.is_authenticated and current_user.id != profile_user.id
-			%}
-			<form
-				method="post"
-				action="{{ url_for('main.toggle_subscribe', username=profile_user.username) }}"
-			>
-				<button type="submit" class="btn">
-					{% if is_subscribed %}Отписаться{% else %}Подписаться{% endif %}
-				</button>
-			</form>
-			{% endif %}
-		</div>
-	</div>
+{% extends "base.html" %}
+{% block title %}{{ profile_user.username }} · Профиль{% endblock %}
+{% block content %}
+<section class="feed-header profile-header">
+  <div class="channel-head">
+    <img class="avatar-lg" src="{% if profile_user.avatar_url %}{{ url_for('main.uploaded_file', filename=profile_user.avatar_url) }}{% else %}{{ url_for('static', path='img/default-avatar.svg') }}{% endif %}" alt="avatar" />
+    <div>
+      <h1>@{{ profile_user.username }}</h1>
+      <span>{{ subscribers_count }} подписчиков · {{ subscriptions_count }} подписок</span>
+      {% if profile_user.bio %}<p class="muted">{{ profile_user.bio }}</p>{% endif %}
+    </div>
+  </div>
+</section>
 
-	{% if videos %}
-	<div class="grid">
-		{% for video in videos %}
-		<a
-			href="{{ url_for('main.video_detail', video_id=video.id) }}"
-			style="text-decoration: none; color: inherit"
-		>
-			<div class="video-card">
-				<div class="video-thumb-wrapper">
-					<img
-						class="video-thumb-image"
-						src="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% else %}{{ url_for('main.uploaded_file', filename=video.filename) }}{% endif %}"
-						alt="{{ video.title }}"
-					/>
-				</div>
-				<div class="video-title">{{ video.title }}</div>
-				<div class="video-meta">
-					<span>{{ video.created_at.strftime("%d.%m.%Y %H:%M") }}</span>
-					<span class="pill">❤ {{ video.likes }}</span>
-				</div>
-			</div>
-		</a>
-		{% endfor %}
-	</div>
-	{% else %}
-	<p class="muted">У этого автора пока нет видео.</p>
-	{% endif %}
-</div>
+{% if current_user.is_authenticated and current_user.id != profile_user.id %}
+<form method="post" action="{{ url_for('main.toggle_subscribe', username=profile_user.username) }}" style="margin-bottom:16px;">
+  <button type="submit">{% if is_subscribed %}Отписаться{% else %}Подписаться{% endif %}</button>
+</form>
+{% endif %}
+
+<section class="video-grid">
+  {% for video in videos %}
+    <article class="video-card">
+      <a href="{{ url_for('main.video_detail', video_id=video.id) }}">
+        <img class="thumb" src="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% else %}{{ url_for('main.uploaded_file', filename=video.filename) }}{% endif %}" alt="{{ video.title }}" />
+      </a>
+      <div class="video-info">
+        <a class="title" href="{{ url_for('main.video_detail', video_id=video.id) }}">{{ video.title }}</a>
+        <p class="meta">{{ video.views }} просмотров</p>
+      </div>
+    </article>
+  {% else %}
+    <p class="empty">У автора пока нет роликов.</p>
+  {% endfor %}
+</section>
 {% endblock %}
