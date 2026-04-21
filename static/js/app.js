@@ -102,6 +102,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const fullscreenBtn = player.querySelector("[data-fullscreen]");
     const speedSelect = player.querySelector("[data-speed]");
 
+    if (!mainVideo || !previewVideo || !progress || !progressWrap || !timeLabel || !previewPopover || !previewCanvas || !previewTime) {
+      return;
+    }
+
     const previewCtx = previewCanvas.getContext("2d");
     mainVideo.volume = Number.isFinite(persistedVolume) ? Math.min(Math.max(persistedVolume, 0), 1) : 0.7;
     mainVideo.muted = persistedMuted;
@@ -259,4 +263,76 @@ document.addEventListener("DOMContentLoaded", () => {
       muteBtn.classList.toggle("is-unmuted", !video.muted);
     });
   });
+
+  document.querySelectorAll(".comment-item[data-comment-id]").forEach((node) => {
+    const commentId = node.getAttribute("data-comment-id");
+    const likeBtn = node.querySelector('[data-comment-action="like"]');
+    const dislikeBtn = node.querySelector('[data-comment-action="dislike"]');
+    const likesCount = node.querySelector(".comment-likes");
+    const dislikesCount = node.querySelector(".comment-dislikes");
+    if (!commentId || !likeBtn || !dislikeBtn) return;
+
+    const react = async (action) => {
+      const response = await fetch(`/api/comments/${commentId}/react`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+        credentials: "same-origin",
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (likesCount) likesCount.textContent = String(data.likes);
+      if (dislikesCount) dislikesCount.textContent = String(data.dislikes);
+    };
+
+    likeBtn.addEventListener("click", () => react("like"));
+    dislikeBtn.addEventListener("click", () => react("dislike"));
+  });
+
+  const shortsFeed = document.getElementById("shorts-feed");
+  const shortsLoader = document.getElementById("shorts-loader");
+  if (shortsFeed && shortsLoader) {
+    let loading = false;
+    let offset = Number(shortsFeed.getAttribute("data-offset") || "0");
+    const limit = 8;
+
+    const loadShorts = async () => {
+      if (loading) return;
+      loading = true;
+      const response = await fetch(`/api/shorts?offset=${offset}&limit=${limit}`);
+      if (!response.ok) {
+        loading = false;
+        return;
+      }
+      const payload = await response.json();
+      const items = payload.items || [];
+      if (items.length === 0) {
+        shortsLoader.textContent = "Вы достигли конца ленты.";
+        loading = false;
+        return;
+      }
+      items.forEach((item) => {
+        const card = document.createElement("article");
+        card.className = "short-card fade-in";
+        card.innerHTML = `
+          <video controls preload="metadata">
+            <source src="/uploads/${item.filename}" type="video/mp4" />
+          </video>
+          <h3>${item.title}</h3>
+          <p>@${item.author} · ${item.views} просмотров</p>
+        `;
+        shortsFeed.appendChild(card);
+      });
+      offset += items.length;
+      shortsFeed.setAttribute("data-offset", String(offset));
+      loading = false;
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) loadShorts();
+    }, { rootMargin: "300px" });
+
+    observer.observe(shortsLoader);
+    loadShorts();
+  }
 });

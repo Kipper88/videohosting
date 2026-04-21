@@ -32,7 +32,10 @@ async def profile(request: Request, username: str, session: AsyncSession = Depen
 
     videos = (
         await session.scalars(
-            select(Video).options(selectinload(Video.author)).where(Video.user_id == user.id).order_by(Video.created_at.desc())
+            select(Video)
+            .options(selectinload(Video.author))
+            .where(Video.user_id == user.id, Video.is_deleted.is_(False), Video.moderation_status == "approved")
+            .order_by(Video.created_at.desc())
         )
     ).all()
 

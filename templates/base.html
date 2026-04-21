@@ -3,22 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% block title %}YouClone{% endblock %}</title>
+  <title>{% block title %}Movier{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}" />
 </head>
 <body>
-  <header class="topbar">
-    <button class="icon-btn" id="sidebar-toggle" type="button" aria-label="Скрыть меню">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z"/></svg>
-    </button>
-    <a class="logo" href="{{ url_for('main.index') }}">YouClone</a>
+  <header class="topbar glass">
+    <button class="icon-btn" id="sidebar-toggle" type="button" aria-label="Скрыть меню">☰</button>
+    <a class="logo" href="{{ url_for('main.index') }}">Movier</a>
     <form class="search" method="get" action="{{ url_for('main.index') }}">
-      <input name="q" value="{{ request.query_params.get('q', '') }}" placeholder="Введите запрос" />
+      <input name="q" value="{{ request.query_params.get('q', '') }}" placeholder="Поиск по видео и тегам" />
       <button type="submit">Поиск</button>
     </form>
     <nav class="top-actions">
       {% if current_user.is_authenticated %}
         <a href="{{ url_for('main.upload') }}">Загрузить</a>
+        <a href="{{ url_for('main.shorts') }}">Shorts</a>
+        {% if current_user.role in ['moderator', 'admin'] %}
+          <a href="{{ url_for('moderation.panel') }}">Модерация</a>
+        {% endif %}
         <a href="{{ url_for('main.profile', username=current_user.username) }}">@{{ current_user.username }}</a>
         <a href="{{ url_for('auth.logout') }}">Выйти</a>
       {% else %}
@@ -29,9 +31,10 @@
   </header>
 
   <div class="layout" id="app-layout">
-    <aside class="sidebar" id="app-sidebar">
+    <aside class="sidebar glass" id="app-sidebar">
       <a class="side-link {% if request.query_params.get('tab', 'home') == 'home' %}active{% endif %}" href="{{ url_for('main.index', tab='home', q=request.query_params.get('q', '')) }}">Главная</a>
       <a class="side-link {% if request.query_params.get('tab') == 'subscriptions' %}active{% endif %}" href="{{ url_for('main.index', tab='subscriptions', q=request.query_params.get('q', '')) }}">Подписки</a>
+      <a class="side-link" href="{{ url_for('main.shorts') }}">Shorts</a>
       {% if current_user.is_authenticated %}
       <a class="side-link" href="{{ url_for('main.profile', username=current_user.username) }}">Ваш канал</a>
       <a class="side-link" href="{{ url_for('main.edit_profile', username=current_user.username) }}">Настройки канала</a>
@@ -40,13 +43,12 @@
 
     <main class="content">
       {% if flashes %}
-          <div class="flash-list">
-            {% for category, msg in flashes %}
-              <div class="flash {{ category }}">{{ msg }}</div>
-            {% endfor %}
-          </div>
-        {% endif %}
-
+        <div class="flash-list fade-in">
+          {% for category, msg in flashes %}
+            <div class="flash {{ category }}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
       {% block content %}{% endblock %}
     </main>
   </div>

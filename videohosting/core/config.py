@@ -5,11 +5,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 UPLOAD_FOLDER = BASE_DIR / "uploads"
 DB_PATH = BASE_DIR / "app.db"
 
-AI_MODELS_DIR = BASE_DIR / "models"
-AI_MODEL_PATH_DEFAULT = AI_MODELS_DIR / "classifier_model.onnx"
-AI_MODEL_PATH_FALLBACK = BASE_DIR / "models_ai" / "classifier_model.onnx"
-
-
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
 
@@ -24,6 +19,4 @@ class Config:
     S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
     S3_BASE_URL = os.getenv("S3_BASE_URL")
 
-    AI_MODEL_PATH = os.getenv("AI_MODEL_PATH", str(AI_MODEL_PATH_DEFAULT))
-    AI_MODEL_PATH_FALLBACK = os.getenv("AI_MODEL_PATH_FALLBACK", str(AI_MODEL_PATH_FALLBACK))
-    AI_UNSAFE_THRESHOLD = float(os.getenv("AI_UNSAFE_THRESHOLD", "0.5"))
+    MANUAL_MODERATION = os.getenv("MANUAL_MODERATION", "true").lower() in {"1", "true", "yes", "on"}

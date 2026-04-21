@@ -13,7 +13,7 @@ from videohosting.services.identity import resolve_current_user
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="YouClone")
+    app = FastAPI(title="Movier")
     app.add_middleware(SessionMiddleware, secret_key=Config.SECRET_KEY)
 
     upload_path = Path(Config.UPLOAD_FOLDER)

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Панель модерации · Movier{% endblock %}
+{% block content %}
+<div class="form-card fade-in">
+  <h1>Панель модератора</h1>
+  <h2>Видео в ожидании</h2>
+  {% for video in pending_videos %}
+    <div class="moderation-card">
+      <p><strong>{{ video.title }}</strong> — @{{ video.author.username if video.author else 'unknown' }}</p>
+      <form method="post" action="{{ url_for('moderation.approve', video_id=video.id) }}"><button>Одобрить</button></form>
+      <form method="post" action="{{ url_for('moderation.reject', video_id=video.id) }}" class="stack">
+        <input name="deletion_reason" placeholder="Причина отклонения" required />
+        <button class="danger-btn">Отклонить</button>
+      </form>
+    </div>
+  {% else %}
+    <p class="muted">Нет видео в ожидании.</p>
+  {% endfor %}
+
+  <h2>Жалобы</h2>
+  <ul>
+    {% for report in reports %}
+      <li>#{{ report.id }} Видео {{ report.video_id }} — причина: {{ report.reason }} ({{ report.created_at.strftime('%d.%m.%Y %H:%M') }})</li>
+    {% else %}
+      <li>Жалоб нет.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

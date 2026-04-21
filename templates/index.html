@@ -1,25 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Главная · YouClone{% endblock %}
+{% block title %}Главная · Movier{% endblock %}
 {% block content %}
-<section class="feed-header">
-  <h1>{% if tab == 'subscriptions' %}Лента подписок{% else %}Рекомендации{% endif %}</h1>
+<section class="feed-header fade-in">
+  <h1>{% if tab == 'subscriptions' %}Лента подписок{% else %}Рекомендации Movier{% endif %}</h1>
   <span>{{ videos|length }} видео</span>
 </section>
 
 <section class="video-grid">
   {% for video in videos %}
-    <article class="video-card" data-hover-preview>
+    <article class="video-card fade-in" data-hover-preview>
       <a href="{{ url_for('main.video_detail', video_id=video.id) }}" class="thumb-link">
         <img class="thumb" src="{% if video.thumbnail_filename %}{{ url_for('main.uploaded_file', filename=video.thumbnail_filename) }}{% else %}{{ url_for('main.uploaded_file', filename=video.filename) }}{% endif %}" alt="{{ video.title }}" data-hover-image />
         <video class="thumb-preview-video" muted preload="metadata" data-hover-video>
           <source src="{{ url_for('main.uploaded_file', filename=video.filename) }}" type="video/mp4" />
         </video>
-        <div class="thumb-preview-controls" data-hover-controls>
-          <input type="range" min="0" max="1000" value="0" step="1" data-hover-progress />
-          <button type="button" class="mini-mute-btn" data-hover-mute>
-            <svg viewBox="0 0 24 24"><path d="M14 5v14l-6-4H4V9h4l6-4Zm3.5 7a3.5 3.5 0 0 0-1.2-2.64l1.42-1.42A5.5 5.5 0 0 1 19.5 12a5.5 5.5 0 0 1-1.78 4.06l-1.42-1.42A3.5 3.5 0 0 0 17.5 12Z"/></svg>
-          </button>
-        </div>
       </a>
       <div class="video-info">
         <img class="avatar-sm" src="{% if video.author and video.author.avatar_url %}{{ url_for('main.uploaded_file', filename=video.author.avatar_url) }}{% else %}{{ url_for('static', path='img/default-avatar.svg') }}{% endif %}" alt="avatar" />
@@ -27,6 +21,7 @@
           <a class="title" href="{{ url_for('main.video_detail', video_id=video.id) }}">{{ video.title }}</a>
           <a class="author" href="{{ url_for('main.profile', username=video.author.username) if video.author else '#' }}">{{ video.author.username if video.author else 'Анонимный автор' }}</a>
           <p class="meta">{{ video.views }} просмотров • {{ video.created_at.strftime('%d.%m.%Y') }}</p>
+          {% if video.tags %}<p class="meta">#{{ video.tags.replace(',', ' #') }}</p>{% endif %}
         </div>
       </div>
     </article>

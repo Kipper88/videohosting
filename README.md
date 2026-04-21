@@ -1,57 +1,31 @@
-## YouClone (FastAPI async prototype)
+## Movier (FastAPI async platform)
 
-Асинхронный прототип видеохостинга в стиле YouTube на FastAPI + async SQLAlchemy.
+Асинхронный видеохостинг на FastAPI + async SQLAlchemy.
 
-### Что уже есть
+### Основные возможности
 
-- регистрация/логин/логаут;
-- загрузка видео с превью и AI-модерацией;
-- домашняя лента, поиск и вкладка подписок;
-- страница просмотра видео (просмотры, лайки/дизлайки);
-- комментарии;
-- профили авторов и подписки.
+- роли: user / moderator / admin;
+- ручная модерация (опционально, `MANUAL_MODERATION`);
+- жалобы на видео;
+- древовидные комментарии + лайки/дизлайки комментариев;
+- Shorts-лента с бесконечной подгрузкой;
+- история просмотров без дубликатов;
+- базовые рекомендации по тегам и популярности за последние 24 часа.
 
-### Новая структура проекта
+### Структура
 
-```text
-videohosting/
-  api/
-    routes/          # HTTP-слой (роутеры)
-    router.py        # композиция роутеров
-  core/
-    config.py        # конфигурация
-  db/
-    base.py          # declarative base
-    models.py        # ORM-модели
-    session.py       # engine/session/dependencies
-  services/
-    files.py         # валидация файлов
-    media.py         # ffmpeg/ffprobe
-    moderation.py    # AI-модерация
-    identity.py      # резолв текущего пользователя
-    cleanup.py       # async-удаление файлов
-  use_cases/
-    video.py         # бизнес-логика фида, реакций, комментариев
-  web/
-    utils.py         # template helpers, flash messages
-  main.py            # создание FastAPI-приложения
-app.py               # entrypoint для `uvicorn app:app`
-```
-
-### Почему это ближе к структуре крупных проектов
-
-- явное разделение слоёв: API / бизнес-логика / сервисы / доступ к данным;
-- единая точка композиции роутов (`api/router.py`);
-- зависимости и инфраструктура БД вынесены в отдельный слой (`db/session.py`);
-- вспомогательная web-логика изолирована от роутов (`web/utils.py`).
+- `videohosting/main.py` — создание FastAPI-приложения;
+- `videohosting/api/routes/` — HTTP-слой;
+- `videohosting/use_cases/` — бизнес-логика;
+- `videohosting/db/` — ORM и async session;
+- `videohosting/services/` — медиа/файлы/identity;
+- `videohosting/web/` — шаблонные helper'ы.
 
 ### Запуск
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
+source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app:app --reload --host 127.0.0.1 --port 8000
 ```
-
-Откройте: `http://127.0.0.1:8000/`.

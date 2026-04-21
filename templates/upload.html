@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Загрузка видео · YouClone{% endblock %}
+{% block title %}Загрузка видео · Movier{% endblock %}
 {% block content %}
-<div class="form-card">
-  <h1>Загрузка видео</h1>
+<div class="form-card fade-in">
+  <h1>Загрузка видео в Movier</h1>
 
   <div class="upload-preview-wrap" aria-live="polite">
     <div class="upload-preview-placeholder">Выберите файл, чтобы увидеть предпросмотр</div>
@@ -18,11 +18,15 @@
       <textarea name="description" rows="5" placeholder="О чем это видео"></textarea>
     </label>
 
+    <label>Теги (через запятую)
+      <input type="text" name="tags" maxlength="500" placeholder="музыка, обзор, гайд" />
+    </label>
+
     <label>Файл
       <input type="file" name="file" accept="video/mp4,video/webm,video/ogg,video/quicktime" required />
     </label>
 
-    <button type="submit">Опубликовать</button>
+    <button type="submit">Отправить</button>
   </form>
 </div>
 {% endblock %}
