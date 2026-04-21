@@ -11,14 +11,39 @@
 - комментарии;
 - профили авторов и подписки.
 
-### Структура
+### Новая структура проекта
 
-- `app.py` — создание и конфигурация FastAPI-приложения;
-- `auth.py` — маршруты авторизации;
-- `main_routes/` — web/API-маршруты;
-- `video_logic.py` — асинхронный бизнес-слой (лента, реакции, комментарии);
-- `models.py` — асинхронные модели БД и engine/session;
-- `services/` — файлы/медиа/модерация.
+```text
+videohosting/
+  api/
+    routes/          # HTTP-слой (роутеры)
+    router.py        # композиция роутеров
+  core/
+    config.py        # конфигурация
+  db/
+    base.py          # declarative base
+    models.py        # ORM-модели
+    session.py       # engine/session/dependencies
+  services/
+    files.py         # валидация файлов
+    media.py         # ffmpeg/ffprobe
+    moderation.py    # AI-модерация
+    identity.py      # резолв текущего пользователя
+    cleanup.py       # async-удаление файлов
+  use_cases/
+    video.py         # бизнес-логика фида, реакций, комментариев
+  web/
+    utils.py         # template helpers, flash messages
+  main.py            # создание FastAPI-приложения
+app.py               # entrypoint для `uvicorn app:app`
+```
+
+### Почему это ближе к структуре крупных проектов
+
+- явное разделение слоёв: API / бизнес-логика / сервисы / доступ к данным;
+- единая точка композиции роутов (`api/router.py`);
+- зависимости и инфраструктура БД вынесены в отдельный слой (`db/session.py`);
+- вспомогательная web-логика изолирована от роутов (`web/utils.py`).
 
 ### Запуск
 

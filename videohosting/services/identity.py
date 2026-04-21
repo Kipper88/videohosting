@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from models import SessionLocal, User
-from web_utils import AnonymousUser
+from videohosting.db import SessionLocal, User
+from videohosting.web.utils import AnonymousUser
 
 
 async def resolve_current_user(request):

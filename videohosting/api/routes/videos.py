@@ -1,23 +1,23 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime
+from pathlib import Path
 
 import aiofiles
-from fastapi import Depends, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from werkzeug.utils import secure_filename
 
-from models import Video, VideoComment, VideoReaction, get_db_session
-from services import allowed_file, generate_thumbnail, moderate_thumbnail_with_ai, moderate_video_content_with_ai
-from video_logic import add_comment, get_related_videos, toggle_reaction
-from web_utils import redirect_with_flash, template_response
+from videohosting.db import Video, VideoComment, VideoReaction, get_db_session
+from videohosting.services import allowed_file, generate_thumbnail, moderate_thumbnail_with_ai, moderate_video_content_with_ai
+from videohosting.services.cleanup import remove_files
+from videohosting.use_cases.video import add_comment, get_related_videos, toggle_reaction
+from videohosting.web.utils import redirect_with_flash, template_response
 
-from .blueprint import bp
-from .helpers import remove_files
+router = APIRouter()
 
 
 async def _ensure_user(request: Request):
@@ -27,13 +27,13 @@ async def _ensure_user(request: Request):
     return user
 
 
-@bp.get("/upload", name="main.upload")
+@router.get("/upload", name="main.upload")
 async def upload_page(request: Request):
     await _ensure_user(request)
     return template_response(request, "upload.html", {})
 
 
-@bp.post("/upload", name="main.upload_post")
+@router.post("/upload", name="main.upload_post")
 async def upload(
     request: Request,
     title: str = Form(""),
@@ -60,23 +60,24 @@ async def upload(
         )
 
     filename = f"{int(datetime.utcnow().timestamp())}_{secure_filename(file.filename)}"
-    save_path = os.path.join(request.app.state.upload_folder, filename)
+    upload_dir = Path(request.app.state.upload_folder)
+    save_path = upload_dir / filename
 
-    async with aiofiles.open(save_path, "wb") as out:
+    async with aiofiles.open(str(save_path), "wb") as out:
         while chunk := await file.read(1024 * 1024):
             await out.write(chunk)
 
     thumb_filename = f"{filename}.jpg"
-    thumb_path = os.path.join(request.app.state.upload_folder, thumb_filename)
-    thumbnail_ok = await generate_thumbnail(save_path, thumb_path)
+    thumb_path = upload_dir / thumb_filename
+    thumbnail_ok = await generate_thumbnail(str(save_path), str(thumb_path))
 
     try:
         is_video_approved, video_label, video_score, checked_frames = await moderate_video_content_with_ai(
-            save_path,
+            str(save_path),
             sample_count=5,
         )
     except Exception:
-        await remove_files(save_path, thumb_path)
+        await remove_files(str(save_path), str(thumb_path))
         return redirect_with_flash(
             request,
             request.url_for("main.upload"),
@@ -85,7 +86,7 @@ async def upload(
         )
 
     if not is_video_approved:
-        await remove_files(save_path, thumb_path)
+        await remove_files(str(save_path), str(thumb_path))
         return redirect_with_flash(
             request,
             request.url_for("main.upload"),
@@ -99,9 +100,9 @@ async def upload(
 
     if thumbnail_ok:
         try:
-            is_approved, thumb_label, thumb_score = await moderate_thumbnail_with_ai(thumb_path)
+            is_approved, thumb_label, thumb_score = await moderate_thumbnail_with_ai(str(thumb_path))
         except Exception:
-            await remove_files(save_path, thumb_path)
+            await remove_files(str(save_path), str(thumb_path))
             return redirect_with_flash(
                 request,
                 request.url_for("main.upload"),
@@ -110,7 +111,7 @@ async def upload(
             )
 
         if not is_approved:
-            await remove_files(save_path, thumb_path)
+            await remove_files(str(save_path), str(thumb_path))
             return redirect_with_flash(
                 request,
                 request.url_for("main.upload"),
@@ -143,7 +144,7 @@ async def upload(
     )
 
 
-@bp.get("/video/{video_id}", name="main.video_detail")
+@router.get("/video/{video_id}", name="main.video_detail")
 async def video_detail(request: Request, video_id: int, session: AsyncSession = Depends(get_db_session)):
     video = await session.scalar(select(Video).options(selectinload(Video.author)).where(Video.id == video_id))
     if not video:
@@ -182,7 +183,7 @@ async def video_detail(request: Request, video_id: int, session: AsyncSession = 
     )
 
 
-@bp.post("/video/{video_id}/comments", name="main.video_comment")
+@router.post("/video/{video_id}/comments", name="main.video_comment")
 async def video_comment(
     request: Request,
     video_id: int,
@@ -204,7 +205,7 @@ async def video_comment(
     )
 
 
-@bp.post("/video/{video_id}/delete", name="main.video_delete")
+@router.post("/video/{video_id}/delete", name="main.video_delete")
 async def video_delete(request: Request, video_id: int, session: AsyncSession = Depends(get_db_session)):
     user = await _ensure_user(request)
     video = await session.get(Video, video_id)
@@ -219,9 +220,9 @@ async def video_delete(request: Request, video_id: int, session: AsyncSession = 
         )
 
     await session.execute(VideoReaction.__table__.delete().where(VideoReaction.video_id == video.id))
-    files = [os.path.join(request.app.state.upload_folder, video.filename)]
+    files = [str(Path(request.app.state.upload_folder) / video.filename)]
     if video.thumbnail_filename:
-        files.append(os.path.join(request.app.state.upload_folder, video.thumbnail_filename))
+        files.append(str(Path(request.app.state.upload_folder) / video.thumbnail_filename))
 
     await session.delete(video)
     await session.commit()
@@ -229,12 +230,12 @@ async def video_delete(request: Request, video_id: int, session: AsyncSession = 
     return redirect_with_flash(request, request.url_for("main.index"), "Видео удалено.", "success")
 
 
-@bp.get("/uploads/{filename:path}", name="main.uploaded_file")
+@router.get("/uploads/{filename:path}", name="main.uploaded_file")
 async def uploaded_file(request: Request, filename: str):
     return RedirectResponse(url=request.url_for("uploads", path=filename), status_code=307)
 
 
-@bp.post("/api/videos/{video_id}/react", name="main.video_react")
+@router.post("/api/videos/{video_id}/react", name="main.video_react")
 async def video_react(request: Request, video_id: int, session: AsyncSession = Depends(get_db_session)):
     user = await _ensure_user(request)
     video = await session.get(Video, video_id)

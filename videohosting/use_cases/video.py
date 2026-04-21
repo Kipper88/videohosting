@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
-from models import SessionLocal, Subscription, User, Video, VideoComment, VideoReaction
+from videohosting.db import SessionLocal, Subscription, User, Video, VideoComment, VideoReaction
 
 
 async def get_home_feed(search: str | None, only_subscriptions: bool, viewer_id: int | None):

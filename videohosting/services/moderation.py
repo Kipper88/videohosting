@@ -7,8 +7,8 @@ from pathlib import Path
 
 import nudenet
 
-from config import Config
-from services.media import extract_frame, get_video_duration
+from videohosting.core.config import Config
+from videohosting.services.media import extract_frame, get_video_duration
 
 UNSAFE_DETECTOR_LABELS = {
     "FEMALE_BREAST_EXPOSED",
