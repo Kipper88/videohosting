@@ -1,12 +1,12 @@
-from fastapi import Request
+from fastapi import APIRouter, Request
 
-from video_logic import get_home_feed
-from web_utils import template_response
+from videohosting.use_cases.video import get_home_feed
+from videohosting.web.utils import template_response
 
-from .blueprint import bp
+router = APIRouter()
 
 
-@bp.get("/", name="main.index")
+@router.get("/", name="main.index")
 async def index(request: Request):
     query = request.query_params.get("q", "").strip()
     tab = request.query_params.get("tab", "home")

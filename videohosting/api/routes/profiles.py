@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime
+from pathlib import Path
 
 import aiofiles
-from fastapi import Depends, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from werkzeug.utils import secure_filename
 
-from models import Subscription, User, Video, get_db_session
-from services import allowed_image_file
-from web_utils import redirect_with_flash, template_response
+from videohosting.db import Subscription, User, Video, get_db_session
+from videohosting.services import allowed_image_file
+from videohosting.web.utils import redirect_with_flash, template_response
 
-from .blueprint import bp
+router = APIRouter()
 
 
 async def _ensure_user(request: Request):
@@ -24,7 +24,7 @@ async def _ensure_user(request: Request):
     return user
 
 
-@bp.get("/u/{username}", name="main.profile")
+@router.get("/u/{username}", name="main.profile")
 async def profile(request: Request, username: str, session: AsyncSession = Depends(get_db_session)):
     user = await session.scalar(select(User).where(User.username == username))
     if not user:
@@ -32,7 +32,10 @@ async def profile(request: Request, username: str, session: AsyncSession = Depen
 
     videos = (
         await session.scalars(
-            select(Video).options(selectinload(Video.author)).where(Video.user_id == user.id).order_by(Video.created_at.desc())
+            select(Video)
+            .options(selectinload(Video.author))
+            .where(Video.user_id == user.id, Video.is_deleted.is_(False), Video.moderation_status == "approved")
+            .order_by(Video.created_at.desc())
         )
     ).all()
 
@@ -68,7 +71,7 @@ async def profile(request: Request, username: str, session: AsyncSession = Depen
     )
 
 
-@bp.get("/u/{username}/edit", name="main.edit_profile")
+@router.get("/u/{username}/edit", name="main.edit_profile")
 async def edit_profile_page(request: Request, username: str, session: AsyncSession = Depends(get_db_session)):
     viewer = await _ensure_user(request)
     user = await session.scalar(select(User).where(User.username == username))
@@ -84,7 +87,7 @@ async def edit_profile_page(request: Request, username: str, session: AsyncSessi
     return template_response(request, "profile_edit.html", {"profile_user": user})
 
 
-@bp.post("/u/{username}/edit", name="main.edit_profile_post")
+@router.post("/u/{username}/edit", name="main.edit_profile_post")
 async def edit_profile(
     request: Request,
     username: str,
@@ -115,11 +118,11 @@ async def edit_profile(
                 "error",
             )
 
-        avatar_dir = os.path.join(request.app.state.upload_folder, "avatars")
-        os.makedirs(avatar_dir, exist_ok=True)
+        avatar_dir = Path(request.app.state.upload_folder) / "avatars"
+        avatar_dir.mkdir(parents=True, exist_ok=True)
         avatar_filename = f"{int(datetime.utcnow().timestamp())}_{secure_filename(avatar.filename)}"
-        avatar_path = os.path.join(avatar_dir, avatar_filename)
-        async with aiofiles.open(avatar_path, "wb") as out:
+        avatar_path = avatar_dir / avatar_filename
+        async with aiofiles.open(str(avatar_path), "wb") as out:
             while chunk := await avatar.read(1024 * 1024):
                 await out.write(chunk)
         user.avatar_url = f"avatars/{avatar_filename}"
@@ -128,7 +131,7 @@ async def edit_profile(
     return redirect_with_flash(request, request.url_for("main.profile", username=username), "Профиль обновлён.", "success")
 
 
-@bp.post("/u/{username}/subscribe", name="main.toggle_subscribe")
+@router.post("/u/{username}/subscribe", name="main.toggle_subscribe")
 async def toggle_subscribe(request: Request, username: str, session: AsyncSession = Depends(get_db_session)):
     viewer = await _ensure_user(request)
     user = await session.scalar(select(User).where(User.username == username))

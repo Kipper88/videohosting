@@ -1,32 +1,31 @@
-## YouClone (FastAPI async prototype)
+## Movier (FastAPI async platform)
 
-Асинхронный прототип видеохостинга в стиле YouTube на FastAPI + async SQLAlchemy.
+Асинхронный видеохостинг на FastAPI + async SQLAlchemy.
 
-### Что уже есть
+### Основные возможности
 
-- регистрация/логин/логаут;
-- загрузка видео с превью и AI-модерацией;
-- домашняя лента, поиск и вкладка подписок;
-- страница просмотра видео (просмотры, лайки/дизлайки);
-- комментарии;
-- профили авторов и подписки.
+- роли: user / moderator / admin;
+- ручная модерация (опционально, `MANUAL_MODERATION`);
+- жалобы на видео;
+- древовидные комментарии + лайки/дизлайки комментариев;
+- Shorts-лента с бесконечной подгрузкой;
+- история просмотров без дубликатов;
+- базовые рекомендации по тегам и популярности за последние 24 часа.
 
 ### Структура
 
-- `app.py` — создание и конфигурация FastAPI-приложения;
-- `auth.py` — маршруты авторизации;
-- `main_routes/` — web/API-маршруты;
-- `video_logic.py` — асинхронный бизнес-слой (лента, реакции, комментарии);
-- `models.py` — асинхронные модели БД и engine/session;
-- `services/` — файлы/медиа/модерация.
+- `videohosting/main.py` — создание FastAPI-приложения;
+- `videohosting/api/routes/` — HTTP-слой;
+- `videohosting/use_cases/` — бизнес-логика;
+- `videohosting/db/` — ORM и async session;
+- `videohosting/services/` — медиа/файлы/identity;
+- `videohosting/web/` — шаблонные helper'ы.
 
 ### Запуск
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
+source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app:app --reload --host 127.0.0.1 --port 8000
 ```
-
-Откройте: `http://127.0.0.1:8000/`.

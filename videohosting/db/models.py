@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
-from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from config import Config
+from .base import Base
 
 
-class Base(AsyncAttrs, DeclarativeBase):
-    pass
+class UserRole(str, Enum):
+    USER = "user"
+    MODERATOR = "moderator"
+    ADMIN = "admin"
 
 
 class User(Base):
@@ -20,6 +22,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(16), default=UserRole.USER.value, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     bio: Mapped[str | None] = mapped_column(String(500), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -41,9 +44,12 @@ class Video(Base):
     views: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     likes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     dislikes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    is_approved: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    moderation_label: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    moderation_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    moderation_status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False, index=True)
+    deletion_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    tags: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    is_short: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
 
     author: Mapped[User | None] = relationship("User", back_populates="videos")
     reactions: Mapped[list[VideoReaction]] = relationship("VideoReaction", back_populates="video")
@@ -71,11 +77,26 @@ class VideoComment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("video_comments.id"), nullable=True)
     text: Mapped[str] = mapped_column(String(1000), nullable=False)
+    likes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    dislikes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     author: Mapped[User] = relationship("User", back_populates="comments")
     video: Mapped[Video] = relationship("Video", back_populates="comments")
+    parent: Mapped[VideoComment | None] = relationship("VideoComment", remote_side="VideoComment.id")
+
+
+class CommentReaction(Base):
+    __tablename__ = "comment_reactions"
+    __table_args__ = (UniqueConstraint("user_id", "comment_id", name="uix_user_comment_reaction"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    comment_id: Mapped[int] = mapped_column(ForeignKey("video_comments.id"), nullable=False)
+    value: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class Subscription(Base):
@@ -88,24 +109,21 @@ class Subscription(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
-def _to_async_db_uri(db_uri: str) -> str:
-    if db_uri.startswith("sqlite:///"):
-        return db_uri.replace("sqlite:///", "sqlite+aiosqlite:///")
-    if db_uri.startswith("postgresql://"):
-        return db_uri.replace("postgresql://", "postgresql+asyncpg://", 1)
-    return db_uri
+class Report(Base):
+    __tablename__ = "reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
-DATABASE_URL = _to_async_db_uri(Config.SQLALCHEMY_DATABASE_URI)
-engine: AsyncEngine = create_async_engine(DATABASE_URL, future=True)
-SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+class ViewHistory(Base):
+    __tablename__ = "view_history"
+    __table_args__ = (UniqueConstraint("user_id", "video_id", name="uix_user_video_history"),)
 
-
-async def init_db() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
-async def get_db_session():
-    async with SessionLocal() as session:
-        yield session
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False)
+    last_viewed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

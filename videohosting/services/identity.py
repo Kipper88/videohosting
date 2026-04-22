@@ -1,18 +1,22 @@
 from __future__ import annotations
 
-from models import SessionLocal, User
-from web_utils import AnonymousUser
+from videohosting.db import SessionLocal, User
+from videohosting.web.utils import AnonymousUser
 
 
 async def resolve_current_user(request):
-    user_id = request.session.get("user_id")
+    session_data = request.scope.get("session")
+    if session_data is None:
+        return AnonymousUser()
+
+    user_id = session_data.get("user_id")
     if not user_id:
         return AnonymousUser()
 
     async with SessionLocal() as session:
         user = await session.get(User, int(user_id))
         if not user:
-            request.session.pop("user_id", None)
+            session_data.pop("user_id", None)
             return AnonymousUser()
 
     user.is_authenticated = True
